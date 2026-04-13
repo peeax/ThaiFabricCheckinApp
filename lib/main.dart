@@ -1,19 +1,37 @@
 import 'package:flutter/material.dart';
-import 'main_wrapper.dart'; // import wrapper เข้ามา
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'firebase_options.dart';
+import 'core/constants.dart';
+import 'screens/intro_screen.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const AewMaiApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class AewMaiApp extends StatelessWidget {
+  const AewMaiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Thai Fabric Checkin',
+      title: 'แอ่วไหม',
       debugShowCheckedModeBanner: false,
-      home: const MainWrapper(), // ใช้ Wrapper เป็นหน้าหลัก
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: darkPurple),
+        fontFamily: appFont,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: darkPurple,
+        ),
+      ),
+      home: const SplashScreen(),
     );
   }
 }
