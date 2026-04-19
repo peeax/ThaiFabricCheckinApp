@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "950520508982",
+    "project_id": "thai-fabric-check-in-app",
+    "storage_bucket": "thai-fabric-check-in-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:950520508982:android:b74796cf8d889ad5db1e97",
+        "android_client_info": {
+          "package_name": "com.example.demo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtz-v8goEF1UVFEERV7eEi3yyiHMJ6Dm0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:950520508982:android:5049acfe9afcac87db1e97",
+        "android_client_info": {
+          "package_name": "com.example.thai_fabric_checkin_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtz-v8goEF1UVFEERV7eEi3yyiHMJ6Dm0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

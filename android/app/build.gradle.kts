@@ -1,9 +1,23 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
+    // START: FlutterFire Configuration
+    id("com.google.gms.google-services")
+    // END: FlutterFire Configuration
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// ฟังก์ชันสำหรับอ่านไฟล์ .env (เวอร์ชัน Kotlin)
+val env = Properties()
+val envFile = rootProject.file("../.env")
+if (envFile.exists()) {
+    env.load(FileInputStream(envFile))
+}
+val mapsApiKey = env.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
 
 android {
     namespace = "com.example.thai_fabric_checkin_app"
@@ -28,6 +42,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // ส่งค่า API Key เข้าไปที่ AndroidManifest (เวอร์ชัน Kotlin)
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
