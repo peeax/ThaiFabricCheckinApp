@@ -7,8 +7,9 @@
  - ดูรายการอีเวนต์ที่กำลังจะจัดขึ้น อีเวนต์ที่ผ่านมาแล้วในจังหวัดนั้น<br><br>
 
  Snapshot of the App:<br>
- <img src="https://img2.pic.in.th/IMG_7532.jpeg" width="200">
- <img src="https://img2.pic.in.th/IMG_7532.jpeg" width="200">
+ <img src="https://img2.pic.in.th/IMG_7376.jpeg" width="200">
+ 
+ <img src="https://img2.pic.in.th/IMG_7402.jpeg" width="200">
 
 
 
