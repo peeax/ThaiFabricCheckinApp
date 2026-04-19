@@ -9,6 +9,15 @@ class EventDetailScreen extends StatelessWidget {
   const EventDetailScreen({super.key, required this.eventData});
   final Map<String, dynamic> eventData;
 
+  // เพิ่มฟังก์ชันเปิดแผนที่
+  Future<void> _openInGoogleMaps(String lat, String lng) async {
+    final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = eventData['name'] as String? ?? 'ไม่มีชื่องาน';
@@ -16,7 +25,11 @@ class EventDetailScreen extends StatelessWidget {
     final thumbnailUrl = (eventData['thumbnailUrl'] != null && (eventData['thumbnailUrl'] as String).isNotEmpty) ? eventData['thumbnailUrl'] as String : '';
     final startDateText = _formatEventDate(eventData['startDate'] as String?);
     final endDateText = _formatEventDate(eventData['endDate'] as String?);
-    final hasCoordinates = eventData['latitude'] != null;
+    
+    // ประกาศตัวแปร lat, lng เพื่อนำไปใช้เปิดแผนที่
+    final lat = eventData['latitude']?.toString() ?? '';
+    final lng = eventData['longitude']?.toString() ?? '';
+    final hasCoordinates = lat.isNotEmpty && lng.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
@@ -29,7 +42,14 @@ class EventDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (thumbnailUrl.isNotEmpty)
-              Image.network(thumbnailUrl, height: 250, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: 250, color: AppColors.darkPurple)),
+              Image.network(
+                thumbnailUrl, 
+                height: 250, 
+                width: double.infinity, 
+                fit: BoxFit.cover, 
+                // แก้ Warning การใช้ _, __, ___ 
+                errorBuilder: (context, error, stackTrace) => Container(height: 250, color: AppColors.darkPurple)
+              ),
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -53,9 +73,7 @@ class EventDetailScreen extends StatelessWidget {
                   if (hasCoordinates)
                     AppButton(
                       label: 'เปิดแผนที่ไปร่วมงาน',
-                      onTap: () {
-                        launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng'));
-                      },
+                      onTap: () => _openInGoogleMaps(lat, lng), // เรียกใช้งานฟังก์ชันที่สร้างไว้ด้านบน
                     ),
                 ],
               ),
