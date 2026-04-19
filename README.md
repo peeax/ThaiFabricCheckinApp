@@ -3,7 +3,5 @@
 ฟังชันหลัก
 
 
-Screenshots 
 
-
-
+[![วิดิโอสาธิตการใช้งาน](https://img.youtube.com/vi/kxf-za-x7Cg/maxresdefault.jpg)](https://www.youtube.com/watch?v=kxf-za-x7Cg)
