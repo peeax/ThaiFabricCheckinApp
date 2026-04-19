@@ -11,7 +11,6 @@
  <img src="https://i.ibb.co/mFRTCSPP/IMG-7402.jpg" width="200">
  <img src="https://i.ibb.co/4ZzqHCHY/IMG-7526.jpg" width="200">
  <img src="https://i.ibb.co/1fY6kwqG/IMG-7529.jpg" width="200">
-
  <img src="https://i.ibb.co/zVYPjdfz/IMG-7530.jpg" width="200">
  <img src="https://i.ibb.co/LhhzFY21/IMG-7531.jpg" width="200">
  <img src="https://i.ibb.co/pvbTz4V5/IMG-7532.jpg" width="200">
