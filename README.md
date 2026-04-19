@@ -14,12 +14,7 @@
  <img src="https://i.ibb.co/zVYPjdfz/IMG-7530.jpg" width="200">
  <img src="https://i.ibb.co/LhhzFY21/IMG-7531.jpg" width="200">
  <img src="https://i.ibb.co/pvbTz4V5/IMG-7532.jpg" width="200">
- <img src="https://i.ibb.co/N29GvG6c/IMG-7452.jpg" width="200">
+ <img src="https://i.ibb.co/N29GvG6c/IMG-7452.jpg" width="200"><br>
 
-
-
-
-
-
-
+วิดิโอสาธิตการใช้งาน (คลิกที่ภาพเพื่อรับชมวิดิโอสาธิต):<br>
 [![วิดิโอสาธิตการใช้งาน](https://img.youtube.com/vi/kxf-za-x7Cg/maxresdefault.jpg)](https://www.youtube.com/watch?v=kxf-za-x7Cg)
