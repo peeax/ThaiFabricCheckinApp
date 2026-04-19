@@ -15,11 +15,11 @@ https://drive.google.com/file/d/1qbuAgKhOuPvVhwp2VZllCMPwZzSQ3HdY/view?usp=shari
 
 3. นำ api ทั้ง 2 api จากไฟล์ข้างต้นมากรอกในไฟล์ .env ให้เสร็จสิ้น
 4. ทำการ run แอปพลิเคชันโดยแนะนำให้ใช้มือถือจริงในการ run แอพพลิเคชัน เนื่องจากต้องใช้ geolocation และ gps จากอุปกรณ์มือถือ
-   เปิด terminal และใช้คำสั่ง
+   โดยทำการเปิด terminal และใช้คำสั่ง
 ```bash
 flutter run
 ```
-
+   
  Snapshot of the App:<br>
  <img src="https://i.ibb.co/j90VGGvr/IMG-7376.jpg" width="200">
  <img src="https://i.ibb.co/mFRTCSPP/IMG-7402.jpg" width="200">
