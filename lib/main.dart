@@ -22,7 +22,8 @@ class AewMaiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: AppStrings.appTitle,
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, // ปิดแถบ Debug
+      // กำหนด Theme หลักของแอป
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.darkPurple),

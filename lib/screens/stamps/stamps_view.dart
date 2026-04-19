@@ -4,6 +4,7 @@ import '../../core/constants.dart';
 import '../../core/app_state.dart';
 import '../../widgets/shared_widgets.dart';
 
+/// หน้าจอคลังแสตมป์ทำหน้าที่แสดงรายการแสตมป์ทั้งหมด
 class StampsView extends StatefulWidget {
   const StampsView({super.key});
   @override
@@ -36,6 +37,7 @@ class _StampsViewState extends State<StampsView> {
       builder: (context, _) {
         final data = appState.userData ?? {};
         final stampCount = data['stampCount'] as int? ?? 0;
+        // ดึงสิทธิ์ Admin มาตรวจสอบ ถ้าเป็น Admin จะอนุญาตให้ดูแสตมป์ได้ทุกดวงโดยไม่ต้องเช็คอินจริง (สำหรับตรวจงาน)
         final isAdmin = data['isAdmin'] as bool? ?? false;
 
         return Scaffold(
@@ -46,12 +48,27 @@ class _StampsViewState extends State<StampsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 70),
-                const Text('คลังแสตมป์', style: TextStyle(color: AppColors.darkPurple, fontSize: 20, fontWeight: FontWeight.bold)),
-                Text('สะสมแล้ว $stampCount/${AppStrings.totalProvinces} จังหวัด', style: const TextStyle(color: AppColors.mediumPurple, fontSize: 14)),
+                const Text(
+                  'คลังแสตมป์',
+                  style: TextStyle(
+                    color: AppColors.darkPurple,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'สะสมแล้ว $stampCount/${AppStrings.totalProvinces} จังหวัด',
+                  style: const TextStyle(
+                    color: AppColors.mediumPurple,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 20),
+                // เรียกใช้ Custom Widget สำหรับช่องค้นหา
                 _SearchField(
                   controller: _searchController,
                   query: _searchQuery,
+                  // เมื่อผู้ใช้พิมพ์ ระบบจะอัปเดต State ให้ List 
                   onChanged: (value) => setState(() => _searchQuery = value),
                   onClear: () {
                     _searchController.clear();
@@ -59,7 +76,11 @@ class _StampsViewState extends State<StampsView> {
                   },
                 ),
                 const SizedBox(height: 15),
-                _FilterDropdown(value: _filterMode, onChanged: (value) => setState(() => _filterMode = value)),
+                // เรียกใช้ Custom Widget สำหรับ Dropdown
+                _FilterDropdown(
+                  value: _filterMode,
+                  onChanged: (value) => setState(() => _filterMode = value),
+                ),
                 const SizedBox(height: 20),
                 _StampListHeader(stampCount: stampCount),
                 const SizedBox(height: 15),
@@ -67,9 +88,19 @@ class _StampsViewState extends State<StampsView> {
                   child: ListenableBuilder(
                     listenable: _stampsManager,
                     builder: (context, _) {
-                      if (_stampsManager.isLoading) return const Center(child: CircularProgressIndicator());
-                      final filteredProvinces = _applyFilters(_stampsManager, isAdmin);
-                      if (filteredProvinces.isEmpty) return const Center(child: Text('ไม่พบจังหวัดที่ตรงกัน', style: TextStyle(color: Colors.grey)));
+                      if (_stampsManager.isLoading)
+                        return const Center(child: CircularProgressIndicator());
+                      final filteredProvinces = _applyFilters(
+                        _stampsManager,
+                        isAdmin,
+                      );
+                      if (filteredProvinces.isEmpty)
+                        return const Center(
+                          child: Text(
+                            'ไม่พบจังหวัดที่ตรงกัน',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
 
                       return ListView.builder(
                         padding: const EdgeInsets.only(bottom: 100),
@@ -77,8 +108,17 @@ class _StampsViewState extends State<StampsView> {
                         itemBuilder: (_, index) {
                           final province = filteredProvinces[index];
                           final provinceId = province['id'] as String;
-                          final isUnlocked = _stampsManager.unlockedProvinceIds.contains(provinceId) || isAdmin;
-                          return StampCard(provinceId: provinceId, provinceData: province, isUnlocked: isUnlocked);
+                          // ตรวจสอบสถานะการปลดล็อก เคยเช็คอินแล้ว (เช็คจาก Set Collection) หรือเป็น Admin
+                          final isUnlocked =
+                              _stampsManager.unlockedProvinceIds.contains(
+                                provinceId,
+                              ) ||
+                              isAdmin;
+                          return StampCard(
+                            provinceId: provinceId,
+                            provinceData: province,
+                            isUnlocked: isUnlocked,
+                          );
                         },
                       );
                     },
@@ -92,13 +132,20 @@ class _StampsViewState extends State<StampsView> {
     );
   }
 
-  List<Map<String, dynamic>> _applyFilters(StampsManager manager, bool isAdmin) {
+  List<Map<String, dynamic>> _applyFilters(
+    StampsManager manager,
+    bool isAdmin,
+  ) {
     return manager.allProvinces.where((province) {
       final name = province['nameTH'] as String? ?? province['id'] as String;
       final provinceId = province['id'] as String;
-      final isUnlocked = manager.unlockedProvinceIds.contains(provinceId) || isAdmin;
+      final isUnlocked =
+          manager.unlockedProvinceIds.contains(provinceId) || isAdmin;
 
+      // 1. เงื่อนไขการค้นหาข้อความ (Text Search Condition)
       if (_searchQuery.isNotEmpty && !name.contains(_searchQuery)) return false;
+
+      // 2. เงื่อนไขหมวดหมู่ (Category Filter Condition)
       if (_filterMode == 'collected' && !isUnlocked) return false;
       if (_filterMode == 'not_collected' && isUnlocked) return false;
       return true;
@@ -106,8 +153,14 @@ class _StampsViewState extends State<StampsView> {
   }
 }
 
+/// วิดเจ็ตช่องค้นหาข้อความ 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller, required this.query, required this.onChanged, required this.onClear});
+  const _SearchField({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
   final TextEditingController controller;
   final String query;
   final ValueChanged<String> onChanged;
@@ -117,41 +170,81 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 45,
-      decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(15), color: AppColors.lightBackground),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(15),
+        color: AppColors.lightBackground,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 15),
       child: Row(
         children: [
           const Icon(Symbols.search, color: Colors.grey, size: 22),
           const SizedBox(width: 10),
-          Expanded(child: TextField(controller: controller, onChanged: onChanged, style: const TextStyle(color: AppColors.darkPurple, fontSize: 14), decoration: const InputDecoration(hintText: 'ค้นหาชื่อจังหวัด...', hintStyle: TextStyle(color: Colors.grey, fontSize: 14), border: InputBorder.none))),
-          if (query.isNotEmpty) GestureDetector(onTap: onClear, child: const Icon(Symbols.close, color: Colors.grey, size: 20)),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: const TextStyle(color: AppColors.darkPurple, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'ค้นหาชื่อจังหวัด...',
+                hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          if (query.isNotEmpty)
+            GestureDetector(
+              onTap: onClear,
+              child: const Icon(Symbols.close, color: Colors.grey, size: 20),
+            ),
         ],
       ),
     );
   }
 }
 
+/// วิดเจ็ตตัวกรองหมวดหมู่ (Dropdown Filter)
 class _FilterDropdown extends StatelessWidget {
   const _FilterDropdown({required this.value, required this.onChanged});
   final String value;
   final ValueChanged<String> onChanged;
-  static const Map<String, String> _filterLabels = {'all': 'ทุกจังหวัด', 'collected': 'จังหวัดที่สะสมแล้ว', 'not_collected': 'ยังไม่ได้สะสม'};
+  static const Map<String, String> _filterLabels = {
+    'all': 'ทุกจังหวัด',
+    'collected': 'จังหวัดที่สะสมแล้ว',
+    'not_collected': 'ยังไม่ได้สะสม',
+  };
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       onSelected: onChanged,
-      itemBuilder: (_) => _filterLabels.entries.map((entry) => PopupMenuItem<String>(value: entry.key, child: Text(entry.value))).toList(),
+      itemBuilder: (_) => _filterLabels.entries
+          .map(
+            (entry) => PopupMenuItem<String>(
+              value: entry.key,
+              child: Text(entry.value),
+            ),
+          )
+          .toList(),
       child: Container(
         width: double.infinity,
         height: 45,
-        decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(15)),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(15),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 15),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(_filterLabels[value] ?? 'ทุกจังหวัด', style: const TextStyle(color: AppColors.darkPurple)),
-            const Icon(Symbols.keyboard_arrow_down, color: AppColors.darkPurple),
+            Text(
+              _filterLabels[value] ?? 'ทุกจังหวัด',
+              style: const TextStyle(color: AppColors.darkPurple),
+            ),
+            const Icon(
+              Symbols.keyboard_arrow_down,
+              color: AppColors.darkPurple,
+            ),
           ],
         ),
       ),
@@ -159,6 +252,7 @@ class _FilterDropdown extends StatelessWidget {
   }
 }
 
+/// วิดเจ็ตส่วนหัวของรายการแสตมป์
 class _StampListHeader extends StatelessWidget {
   const _StampListHeader({required this.stampCount});
   final int stampCount;
@@ -169,15 +263,35 @@ class _StampListHeader extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('ทั้งหมด', style: TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.bold)),
-            Text('$stampCount/${AppStrings.totalProvinces}', style: const TextStyle(color: AppColors.darkPurple)),
+            const Text(
+              'ทั้งหมด',
+              style: TextStyle(
+                color: AppColors.darkPurple,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              '$stampCount/${AppStrings.totalProvinces}',
+              style: const TextStyle(color: AppColors.darkPurple),
+            ),
           ],
         ),
         const SizedBox(height: 8),
         Stack(
           children: [
-            Container(width: double.infinity, height: 1, color: Colors.grey.shade300),
-            Container(width: 55, height: 3, decoration: BoxDecoration(color: AppColors.darkPurple, borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: Colors.grey.shade300,
+            ),
+            Container(
+              width: 55,
+              height: 3,
+              decoration: BoxDecoration(
+                color: AppColors.darkPurple,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ],
         ),
       ],

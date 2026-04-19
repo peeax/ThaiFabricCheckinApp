@@ -23,6 +23,7 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
   String _detectedProvince = 'กำลังระบุตำแหน่ง...';
   bool _isCheckingIn = false;
   bool _hasLocationPermission = false;
+  // ใช้ UniqueKey สำหรับบัคับให้ Google Maps Re-build
   Key _mapKey = UniqueKey();
 
   @override
@@ -43,13 +44,17 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed && mounted) _initLocation();
   }
 
+  /// ฟังก์ชันเริ่มต้นสำหรับขอสิทธิ์และตรวจสอบสถานะ GPS
   Future<void> _initLocation() async {
     try {
+      // 1. ตรวจสอบว่าเปิดระบบ Location Service (GPS) ที่เครื่องหรือไม่
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (mounted) setState(() => _detectedProvince = 'กรุณาเปิด GPS ในเครื่อง');
+        if (mounted)
+          setState(() => _detectedProvince = 'กรุณาเปิด GPS ในเครื่อง');
         return;
       }
+      // 2. ตรวจสอบสิทธิ์การเข้าถึงตำแหน่ง
       var permission = await Geolocator.checkPermission();
       bool isFirstTimeGrant = false;
       if (permission == LocationPermission.denied) {
@@ -57,10 +62,14 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
         isFirstTimeGrant = true;
       }
       if (!mounted) return;
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (mounted) setState(() => _detectedProvince = 'ไม่อนุญาตการเข้าถึงตำแหน่ง');
+      // 3. จัดการกรณีผู้ใช้ปฏิเสธสิทธิ์ (Graceful Error Handling)
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted)
+          setState(() => _detectedProvince = 'ไม่อนุญาตการเข้าถึงตำแหน่ง');
         return;
       }
+      // 4. ได้รับสิทธิ์เรียบร้อย
       if (mounted) {
         setState(() {
           _hasLocationPermission = true;
@@ -68,12 +77,19 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
         });
       }
       if (!mounted) return;
+      // 5. เมื่อเงื่อนไขครบจึงเริ่มดึงพิกัด
       await _loadCurrentLocation();
     } catch (e) {
-      if (mounted) setState(() => _detectedProvince = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted)
+        setState(
+          () =>
+              _detectedProvince = e.toString().replaceFirst('Exception: ', ''),
+        );
     }
   }
 
+  /// ฟังก์ชันดึงพิกัดปัจจุบัน พร้อมระบบทำซ้ำ 3 ครั้ง
+  /// ป้องกันปัญหาพิกัดดึงไม่สำเร็จในครั้งแรก
   Future<void> _loadCurrentLocation() async {
     const maxRetries = 3;
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
@@ -81,22 +97,35 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
       try {
         final position = await LocationService.getCurrentPosition();
         if (!mounted) return;
-        final province = await LocationService.getProvinceNameFromCoordinates(position.latitude, position.longitude);
+        // Reverse Geocoding: แปลงพิกัด Lat/Lng เป็นชื่อจังหวัด
+        final province = await LocationService.getProvinceNameFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
         if (mounted) {
           setState(() {
             _currentPosition = LatLng(position.latitude, position.longitude);
             _detectedProvince = province;
           });
-          _mapController?.animateCamera(CameraUpdate.newLatLng(_currentPosition));
+          // เลื่อนแผนที่ไปยังตำแหน่งปัจจุบัน
+          _mapController?.animateCamera(
+            CameraUpdate.newLatLng(_currentPosition),
+          );
         }
-        return;
+        return; // สำเร็จแล้วออกจากลูป Retry
       } catch (e) {
         AppLog.debug('_loadCurrentLocation attempt $attempt failed: $e');
         if (attempt < maxRetries) {
           await Future.delayed(Duration(seconds: attempt * 2));
           if (!mounted) return;
         } else {
-          if (mounted) setState(() => _detectedProvince = e.toString().replaceFirst('Exception: ', 'ไม่สามารถระบุตำแหน่งได้'));
+          if (mounted)
+            setState(
+              () => _detectedProvince = e.toString().replaceFirst(
+                'Exception: ',
+                'ไม่สามารถระบุตำแหน่งได้',
+              ),
+            );
         }
       }
     }
@@ -107,17 +136,28 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
     if (uid.isEmpty) return;
     setState(() => _isCheckingIn = true);
     try {
-      final provinceData = await CheckInService.checkIn(uid: uid, provinceName: _detectedProvince);
+      // โยนหน้าที่การบันทึกลง Database ไปให้ Service Layer จัดการ
+      final provinceData = await CheckInService.checkIn(
+        uid: uid,
+        provinceName: _detectedProvince,
+      );
       if (mounted) _showCheckInSuccessDialog(_detectedProvince, provinceData);
     } catch (e) {
+      // แสดงข้อความแจ้งเตือน Error (เช่น เช็คอินซ้ำ หรือจังหวัดยังไม่เปิด)
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: AppColors.mediumPurple));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: AppColors.mediumPurple,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isCheckingIn = false);
     }
   }
 
+  /// สร้าง Dialog แจ้งเตือนเมื่อเช็คอินสำเร็จ
   void _showCheckInSuccessDialog(String provinceId, Map<String, dynamic> data) {
     showDialog(
       context: context,
@@ -129,24 +169,69 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Symbols.celebration, color: AppColors.darkPurple, size: 40),
+              const Icon(
+                Symbols.celebration,
+                color: AppColors.darkPurple,
+                size: 40,
+              ),
               const SizedBox(height: 15),
-              const Text('เช็คอินสำเร็จ!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkPurple)),
-              const Text('คุณได้รับแสตมป์ประจำจังหวัด', style: TextStyle(fontSize: 14, color: AppColors.darkPurple)),
+              const Text(
+                'เช็คอินสำเร็จ!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkPurple,
+                ),
+              ),
+              const Text(
+                'คุณได้รับแสตมป์ประจำจังหวัด',
+                style: TextStyle(fontSize: 14, color: AppColors.darkPurple),
+              ),
               const SizedBox(height: 20),
               ClipRRect(
                 borderRadius: BorderRadius.circular(15),
-                child: Image.network(data['stampImageUrl'] as String? ?? '', width: 180, height: 180, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Symbols.grid_4x4, size: 100, color: AppColors.darkPurple)),
+                child: Image.network(
+                  data['stampImageUrl'] as String? ?? '',
+                  width: 180,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Symbols.grid_4x4,
+                    size: 100,
+                    color: AppColors.darkPurple,
+                  ),
+                ),
               ),
               const SizedBox(height: 15),
-              Text(data['nameTH'] as String? ?? provinceId, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkPurple)),
-              Text(data['stampPatternName'] as String? ?? '', style: const TextStyle(fontSize: 12, color: AppColors.darkPurple)),
+              Text(
+                data['nameTH'] as String? ?? provinceId,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkPurple,
+                ),
+              ),
+              Text(
+                data['stampPatternName'] as String? ?? '',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.darkPurple,
+                ),
+              ),
               const SizedBox(height: 25),
               AppButton(
                 label: 'ดูรายละเอียด',
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute<void>(builder: (_) => StampDetailScreen(provinceId: provinceId, provinceData: data)));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => StampDetailScreen(
+                        provinceId: provinceId,
+                        provinceData: data,
+                      ),
+                    ),
+                  );
                 },
               ),
             ],
@@ -156,6 +241,7 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
     );
   }
 
+  // ใช้ ListenableBuilder เพื่ออัปเดต UI หน้าหลักเมื่อยอดแสตมป์เปลี่ยนแปลงแบบ Real-time
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -175,7 +261,11 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 70),
-                _CheckInHeader(dayName: dayName, username: username, onProfileTap: () => widget.onChangeTab(4)),
+                _CheckInHeader(
+                  dayName: dayName,
+                  username: username,
+                  onProfileTap: () => widget.onChangeTab(4),
+                ),
                 const SizedBox(height: 25),
                 _StampProgressCard(stampCount: stampCount),
                 const SizedBox(height: 25),
@@ -189,7 +279,10 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
                   onCheckIn: _performCheckIn,
                 ),
                 const SizedBox(height: 25),
-                _RecentStampsSection(uid: uid, onViewAll: () => widget.onChangeTab(1)),
+                _RecentStampsSection(
+                  uid: uid,
+                  onViewAll: () => widget.onChangeTab(1),
+                ),
                 const SizedBox(height: 100),
               ],
             ),
@@ -199,11 +292,25 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
     );
   }
 
-  String _thaiDayName(int weekday) => const ['', 'วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์', 'วันอาทิตย์'][weekday];
+  String _thaiDayName(int weekday) => const [
+    '',
+    'วันจันทร์',
+    'วันอังคาร',
+    'วันพุธ',
+    'วันพฤหัสบดี',
+    'วันศุกร์',
+    'วันเสาร์',
+    'วันอาทิตย์',
+  ][weekday];
 }
 
+/// ส่วนหัวของหน้าจอแสดงข้อความสวัสดีวัน...และโปรไฟล์
 class _CheckInHeader extends StatelessWidget {
-  const _CheckInHeader({required this.dayName, required this.username, required this.onProfileTap});
+  const _CheckInHeader({
+    required this.dayName,
+    required this.username,
+    required this.onProfileTap,
+  });
   final String dayName;
   final String username;
   final VoidCallback onProfileTap;
@@ -216,16 +323,34 @@ class _CheckInHeader extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('สวัสดี${dayName}คุณ $username', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.darkPurple)),
-            const Text('สะสมแสตมป์วันนี้กันเถอะ!', style: TextStyle(fontSize: 14, color: AppColors.darkPurple)),
+            Text(
+              'สวัสดี${dayName}คุณ $username',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: AppColors.darkPurple,
+              ),
+            ),
+            const Text(
+              'สะสมแสตมป์วันนี้กันเถอะ!',
+              style: TextStyle(fontSize: 14, color: AppColors.darkPurple),
+            ),
           ],
         ),
-        GestureDetector(onTap: onProfileTap, child: const CircleAvatar(radius: 25, backgroundImage: AssetImage('assets/images/default_profile.png'), backgroundColor: Colors.transparent)),
+        GestureDetector(
+          onTap: onProfileTap,
+          child: const CircleAvatar(
+            radius: 25,
+            backgroundImage: AssetImage('assets/images/default_profile.png'),
+            backgroundColor: Colors.transparent,
+          ),
+        ),
       ],
     );
   }
 }
 
+/// การ์ดแสดงความคืบหน้าการสะสมแสตมป์ 
 class _StampProgressCard extends StatelessWidget {
   const _StampProgressCard({required this.stampCount});
   final int stampCount;
@@ -235,20 +360,38 @@ class _StampProgressCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(color: AppColors.darkPurple, borderRadius: BorderRadius.circular(35)),
+      decoration: BoxDecoration(
+        color: AppColors.darkPurple,
+        borderRadius: BorderRadius.circular(35),
+      ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('ไปมาแล้ว', style: TextStyle(color: Colors.white, fontSize: 14)),
-              Text('$stampCount / ${AppStrings.totalProvinces}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+              const Text(
+                'ไปมาแล้ว',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              Text(
+                '$stampCount / ${AppStrings.totalProvinces}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 15),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(value: progress, minHeight: 8, backgroundColor: Colors.white24, valueColor: const AlwaysStoppedAnimation<Color>(Colors.white)),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: Colors.white24,
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
           ),
         ],
       ),
@@ -256,8 +399,17 @@ class _StampProgressCard extends StatelessWidget {
   }
 }
 
+/// การ์ดแสดงแผนที่ Google Maps และปุ่มกดเช็คอิน
 class _MapCheckInCard extends StatelessWidget {
-  const _MapCheckInCard({super.key, required this.position, required this.provinceName, required this.isCheckingIn, required this.onMapCreated, required this.onCheckIn, this.hasPermission = false});
+  const _MapCheckInCard({
+    super.key,
+    required this.position,
+    required this.provinceName,
+    required this.isCheckingIn,
+    required this.onMapCreated,
+    required this.onCheckIn,
+    this.hasPermission = false,
+  });
   final LatLng position;
   final String provinceName;
   final bool isCheckingIn;
@@ -269,17 +421,43 @@ class _MapCheckInCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 350,
-      decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(30)),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(30),
+      ),
       child: Column(
         children: [
-          Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(30)), child: GoogleMap(initialCameraPosition: CameraPosition(target: position, zoom: 14), onMapCreated: onMapCreated, myLocationEnabled: true, zoomControlsEnabled: false))),
-          Padding(padding: const EdgeInsets.all(15), child: AppButton(label: 'เช็คอินที่ $provinceName', isLoading: isCheckingIn, onTap: onCheckIn)),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: position,
+                  zoom: 14,
+                ),
+                onMapCreated: onMapCreated,
+                myLocationEnabled: true,
+                zoomControlsEnabled: false,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: AppButton(
+              label: 'เช็คอินที่ $provinceName',
+              isLoading: isCheckingIn,
+              onTap: onCheckIn,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
+/// ส่วนแสดงประวัติการสะสมแสตมป์ล่าสุด (Recent Stamps)
 class _RecentStampsSection extends StatelessWidget {
   const _RecentStampsSection({required this.uid, required this.onViewAll});
   final String uid;
@@ -292,16 +470,37 @@ class _RecentStampsSection extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('สะสมล่าสุด', style: TextStyle(fontSize: 14, color: AppColors.darkPurple)),
-            TextButton(onPressed: onViewAll, child: const Text('ดูทั้งหมด', style: TextStyle(fontSize: 14, color: AppColors.darkPurple))),
+            const Text(
+              'สะสมล่าสุด',
+              style: TextStyle(fontSize: 14, color: AppColors.darkPurple),
+            ),
+            TextButton(
+              onPressed: onViewAll,
+              child: const Text(
+                'ดูทั้งหมด',
+                style: TextStyle(fontSize: 14, color: AppColors.darkPurple),
+              ),
+            ),
           ],
         ),
         SizedBox(
           height: 80,
           child: StreamBuilder<QuerySnapshot>(
-            stream: firestoreDB.collection('users').doc(uid).collection('checkins').orderBy('at', descending: true).limit(5).snapshots(),
+            stream: firestoreDB
+                .collection('users')
+                .doc(uid)
+                .collection('checkins')
+                .orderBy('at', descending: true)
+                .limit(5)
+                .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('ยังไม่มีแสตมป์', style: TextStyle(color: Colors.grey)));
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                return const Center(
+                  child: Text(
+                    'ยังไม่มีแสตมป์',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                );
               return ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: snapshot.data!.docs.length,
@@ -309,9 +508,18 @@ class _RecentStampsSection extends StatelessWidget {
                   final doc = snapshot.data!.docs[index];
                   final provinceData = doc.data() as Map<String, dynamic>;
                   final provinceId = doc.id;
-                  final stampImageUrl = provinceData['stampImageUrl'] as String? ?? '';
+                  final stampImageUrl =
+                      provinceData['stampImageUrl'] as String? ?? '';
                   return GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => StampDetailScreen(provinceId: provinceId, provinceData: provinceData))),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => StampDetailScreen(
+                          provinceId: provinceId,
+                          provinceData: provinceData,
+                        ),
+                      ),
+                    ),
                     child: _RecentStampThumbnail(imageUrl: stampImageUrl),
                   );
                 },
@@ -324,6 +532,7 @@ class _RecentStampsSection extends StatelessWidget {
   }
 }
 
+/// วิดเจ็ตสำหรับแสดงรูปภาพแสตมป์ขนาดเล็ก
 class _RecentStampThumbnail extends StatelessWidget {
   const _RecentStampThumbnail({required this.imageUrl});
   final String imageUrl;
@@ -332,10 +541,20 @@ class _RecentStampThumbnail extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(right: 12),
       width: 80,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), color: Colors.grey.shade200),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        color: Colors.grey.shade200,
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
-        child: imageUrl.isNotEmpty ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Symbols.image, color: Colors.grey)) : const Icon(Symbols.image, color: Colors.grey),
+        child: imageUrl.isNotEmpty
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Symbols.image, color: Colors.grey),
+              )
+            : const Icon(Symbols.image, color: Colors.grey),
       ),
     );
   }

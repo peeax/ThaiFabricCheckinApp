@@ -4,6 +4,12 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../core/constants.dart';
 import '../screens/stamps/stamp_detail_screen.dart';
 
+/* ========================================================= 
+   Shared Widgets Repository
+   รวม Custom Components ที่ใช้ซ้ำในหลายๆ หน้าจอ 
+========================================================= */
+
+/// ปุ่มกดจัดการสถานะ Disable และ Loading
 class AppButton extends StatelessWidget {
   const AppButton({super.key, required this.label, this.onTap, this.isLoading = false});
   final String label;
@@ -23,6 +29,7 @@ class AppButton extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         ),
         alignment: Alignment.center,
+        // สลับ UI อัตโนมัติระหว่างข้อความ กับ โหลด Progres
         child: isLoading
             ? const CircularProgressIndicator(color: Colors.white)
             : Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
@@ -31,6 +38,7 @@ class AppButton extends StatelessWidget {
   }
 }
 
+/// ช่องกรอกข้อความอเนกประสงค์ (Reusable Text Field)
 class AppTextField extends StatefulWidget {
   const AppTextField({super.key, required this.controller, required this.hint, this.isPassword = false, this.keyboardType = TextInputType.text, this.enabled = true});
   final TextEditingController controller;
@@ -57,6 +65,7 @@ class _AppTextFieldState extends State<AppTextField> {
       width: double.infinity,
       height: 44,
       decoration: BoxDecoration(
+        // เปลี่ยนสีเส้นขอบและพื้นหลังเพื่อแสดงสถานะว่า Field นี้ถูก Disable อยู่หรือไม่
         border: Border.all(color: widget.enabled ? AppColors.darkPurple : Colors.grey.shade300),
         borderRadius: BorderRadius.circular(5),
         color: widget.enabled ? AppColors.lightBackground : Colors.grey.shade50,
@@ -72,6 +81,7 @@ class _AppTextFieldState extends State<AppTextField> {
           border: InputBorder.none,
           hintText: widget.hint,
           hintStyle: const TextStyle(color: Colors.black38),
+          // Conditional Rendering: วาดไอคอนรูปลูกตาเฉพาะเมื่อ Field นี้เป็นช่องใส่รหัสผ่าน
           suffixIcon: widget.isPassword
               ? IconButton(
                   icon: Icon(_isObscured ? Icons.visibility_off : Icons.visibility, color: AppColors.darkPurple, size: 20),
@@ -84,6 +94,7 @@ class _AppTextFieldState extends State<AppTextField> {
   }
 }
 
+/// วิดเจ็ตปุ่มเรียกปฏิทิน
 class DatePickerField extends StatelessWidget {
   const DatePickerField({super.key, required this.label, required this.hasValue, required this.onTap});
   final String label;
@@ -131,6 +142,7 @@ class NavButton extends StatelessWidget {
   }
 }
 
+/// การ์ดแสดงสถิติตัวเลข (Stat Card) สำหรับหน้าโปรไฟล์
 class StatCard extends StatelessWidget {
   const StatCard({super.key, required this.value, required this.label});
   final String value;
@@ -153,6 +165,7 @@ class StatCard extends StatelessWidget {
   }
 }
 
+/// กรอบ Layout ย่อยสำหรับจัดกลุ่มข้อมูลในหน้าโปรไฟล์ (Section Layout Component)
 class ProfileSection extends StatelessWidget {
   const ProfileSection({super.key, required this.title, required this.children, this.showEditButton = false, this.onEditTap});
   final String title;
@@ -209,6 +222,7 @@ class ProfileInfoItem extends StatelessWidget {
   }
 }
 
+/// วิดเจ็ตปกสถานที่พร้อม Gradient และ Text ฝังตัว
 class ProvinceCoverImage extends StatelessWidget {
   const ProvinceCoverImage({super.key, required this.coverUrl, required this.nameTH, required this.nameEn});
   final String coverUrl;
@@ -239,6 +253,7 @@ class ProvinceCoverImage extends StatelessWidget {
   }
 }
 
+/// การ์ดแสตมป์สำหรับหน้ารายการ (List Item Component)
 class StampCard extends StatelessWidget {
   const StampCard({super.key, required this.provinceId, required this.provinceData, required this.isUnlocked});
   final String provinceId;
@@ -252,6 +267,7 @@ class StampCard extends StatelessWidget {
     final patternName = provinceData['stampPatternName'] as String? ?? '';
 
     return GestureDetector(
+      // หากยังไม่ถูกปลดล็อก จะไม่สามารถกดเข้าไปดูรายละเอียดได้
       onTap: isUnlocked ? () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => StampDetailScreen(provinceId: provinceId, provinceData: provinceData))) : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -259,6 +275,7 @@ class StampCard extends StatelessWidget {
         decoration: BoxDecoration(color: AppColors.lightBackground, border: Border.all(color: AppColors.borderLight), borderRadius: BorderRadius.circular(20)),
         child: Row(
           children: [
+            // แยก Logic ภาพ Thumbnail ไปไว้ใน Sub-widget เพื่อให้โค้ดส่วนนี้อ่านง่ายขึ้น
             _StampThumbnail(imageUrl: imageUrl, isUnlocked: isUnlocked),
             const SizedBox(width: 15),
             Expanded(
@@ -267,6 +284,7 @@ class StampCard extends StatelessWidget {
                 children: [
                   Text(nameTH, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkPurple)),
                   const SizedBox(height: 4),
+                  // แสดงข้อความตามสถานะการปลดล็อก (Dynamic UI Text)
                   Text(isUnlocked ? patternName : 'ยังไม่ได้เช็คอิน', style: const TextStyle(fontSize: 12, color: AppColors.mediumPurple), maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
@@ -279,6 +297,7 @@ class StampCard extends StatelessWidget {
   }
 }
 
+/// วิดเจ็ตจัดการรูปแสตมป์ขนาดย่อ พร้อมเอฟเฟกต์เบลอ
 class _StampThumbnail extends StatelessWidget {
   const _StampThumbnail({required this.imageUrl, required this.isUnlocked});
   final String imageUrl;
@@ -300,6 +319,7 @@ class _StampThumbnail extends StatelessWidget {
                   ? Image.network(imageUrl, fit: BoxFit.cover, width: 65, height: 65, color: isUnlocked ? null : Colors.black.withAlpha(51), colorBlendMode: BlendMode.darken, errorBuilder: (_, __, ___) => const Icon(Symbols.stars, color: AppColors.darkPurple))
                   : Container(color: Colors.grey.shade300),
             ),
+            // ไอคอนแม่กุญแจด้านบน หากยังไม่ปลดล็อก
             if (!isUnlocked) const Icon(Symbols.lock, color: Colors.white, size: 24),
           ],
         ),
@@ -308,6 +328,7 @@ class _StampThumbnail extends StatelessWidget {
   }
 }
 
+/// การ์ดสำหรับแสดงข้อมูลบนหน้าอันดับ
 class LeaderboardCard extends StatelessWidget {
   const LeaderboardCard({super.key, required this.rank, required this.username, required this.stampCount, required this.isMyAccount});
   final int rank;
@@ -315,6 +336,7 @@ class LeaderboardCard extends StatelessWidget {
   final int stampCount;
   final bool isMyAccount;
 
+  //ถ้วยรางวัลทองเงินทองแดง
   Color _trophyColor() => switch (rank) { 1 => Colors.amber, 2 => Colors.grey, 3 => const Color(0xFFCD7F32), _ => Colors.transparent };
 
   @override

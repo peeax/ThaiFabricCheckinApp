@@ -21,11 +21,16 @@ class EventDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = eventData['name'] as String? ?? 'ไม่มีชื่องาน';
-    final introduction = eventData['introduction'] as String? ?? 'ไม่มีรายละเอียด';
-    final thumbnailUrl = (eventData['thumbnailUrl'] != null && (eventData['thumbnailUrl'] as String).isNotEmpty) ? eventData['thumbnailUrl'] as String : '';
+    final introduction =
+        eventData['introduction'] as String? ?? 'ไม่มีรายละเอียด';
+    final thumbnailUrl =
+        (eventData['thumbnailUrl'] != null &&
+            (eventData['thumbnailUrl'] as String).isNotEmpty)
+        ? eventData['thumbnailUrl'] as String
+        : '';
     final startDateText = _formatEventDate(eventData['startDate'] as String?);
     final endDateText = _formatEventDate(eventData['endDate'] as String?);
-    
+
     // ประกาศตัวแปร lat, lng เพื่อนำไปใช้เปิดแผนที่
     final lat = eventData['latitude']?.toString() ?? '';
     final lng = eventData['longitude']?.toString() ?? '';
@@ -34,8 +39,18 @@ class EventDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
       appBar: AppBar(
-        title: const Text('รายละเอียดอีเวนต์', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        leading: GestureDetector(onTap: () => Navigator.pop(context), child: const Icon(Symbols.arrow_back_ios_new, color: AppColors.darkPurple, size: 24)),
+        title: const Text(
+          'รายละเอียดอีเวนต์',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: const Icon(
+            Symbols.arrow_back_ios_new,
+            color: AppColors.darkPurple,
+            size: 24,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -43,37 +58,72 @@ class EventDetailScreen extends StatelessWidget {
           children: [
             if (thumbnailUrl.isNotEmpty)
               Image.network(
-                thumbnailUrl, 
-                height: 250, 
-                width: double.infinity, 
-                fit: BoxFit.cover, 
-                // แก้ Warning การใช้ _, __, ___ 
-                errorBuilder: (context, error, stackTrace) => Container(height: 250, color: AppColors.darkPurple)
+                thumbnailUrl,
+                height: 250,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                // แก้ Warning การใช้ _, __, ___
+                errorBuilder: (context, error, stackTrace) =>
+                    Container(height: 250, color: AppColors.darkPurple),
               ),
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.darkPurple)),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkPurple,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   if (startDateText.isNotEmpty)
                     Row(
                       children: [
-                        const Icon(Symbols.calendar_today, size: 18, color: AppColors.mediumPurple),
+                        const Icon(
+                          Symbols.calendar_today,
+                          size: 18,
+                          color: AppColors.mediumPurple,
+                        ),
                         const SizedBox(width: 8),
-                        Text('วันที่: $startDateText - $endDateText', style: const TextStyle(fontSize: 12, color: AppColors.mediumPurple)),
+                        Text(
+                          'วันที่: $startDateText - $endDateText',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.mediumPurple,
+                          ),
+                        ),
                       ],
                     ),
                   const SizedBox(height: 20),
-                  const Text('รายละเอียดกิจกรรม', style: TextStyle(fontSize: 18, color: AppColors.darkPurple, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'รายละเอียดกิจกรรม',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: AppColors.darkPurple,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 10),
-                  Text(introduction, style: const TextStyle(fontSize: 12, color: AppColors.darkPurple, height: 1.6)),
+                  Text(
+                    introduction,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.darkPurple,
+                      height: 1.6,
+                    ),
+                  ),
                   const SizedBox(height: 30),
                   if (hasCoordinates)
                     AppButton(
                       label: 'เปิดแผนที่ไปร่วมงาน',
-                      onTap: () => _openInGoogleMaps(lat, lng), // เรียกใช้งานฟังก์ชันที่สร้างไว้ด้านบน
+                      onTap: () => _openInGoogleMaps(
+                        lat,
+                        lng,
+                      ), // เรียกใช้งานฟังก์ชันที่สร้างไว้ด้านบน
                     ),
                 ],
               ),

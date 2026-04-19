@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
 final FirebaseFirestore firestoreDB = FirebaseFirestore.instance;
 
+/// คลาสสีหลักของแอป
 class AppColors {
   AppColors._();
   static const Color darkPurple = Color(0xFF13084C);

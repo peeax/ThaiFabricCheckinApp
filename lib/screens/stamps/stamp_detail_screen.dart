@@ -4,13 +4,18 @@ import '../../core/constants.dart';
 import '../../widgets/shared_widgets.dart';
 import '../shared_places/sub_list_screen.dart';
 
+/// แสดงรายละเอียดของแสตมป์ประจำจังหวัด (Stamp Detail)
 class StampDetailScreen extends StatelessWidget {
+  // รับข้อมูล provinceData มาจากหน้าก่อนหน้า 
+  // เพื่อลดการยิง API ซ้ำซ้อนไปยัง Firestore
   const StampDetailScreen({super.key, required this.provinceId, required this.provinceData});
   final String provinceId;
   final Map<String, dynamic> provinceData;
 
   @override
   Widget build(BuildContext context) {
+    // ดึงข้อมูลจาก Map โดยมีการกำหนด Fallback value ('') หรือค่า Default ไว้เสมอ
+    // เพื่อป้องกันแอปพลิเคชัน Crash ในกรณีที่ฟิลด์ข้อมูลในฐานข้อมูลสูญหาย หรือเป็น Null
     final coverUrl = provinceData['coverImageUrl'] as String? ?? '';
     final stampUrl = provinceData['stampImageUrl'] as String? ?? '';
     final nameTH = provinceData['nameTH'] as String? ?? provinceId;
@@ -18,6 +23,7 @@ class StampDetailScreen extends StatelessWidget {
     final patternName = provinceData['stampPatternName'] as String? ?? 'ลายแสตมป์';
     final description = provinceData['stampDescription'] as String? ?? 'ไม่มีรายละเอียด';
 
+    //ui สวยๆ
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -50,13 +56,17 @@ class StampDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       Center(
+                      // แสดงรูปแสตมป์ โดยมีการดักจับ Error กรณีโหลดภาพไม่สำเร็จ 
+                      // ระบบจะเปลี่ยนไปแสดง Icon รูปดาว
                         child: stampUrl.isNotEmpty
                             ? Image.network(stampUrl, height: 180, errorBuilder: (_, __, ___) => const Icon(Symbols.stars, size: 100, color: AppColors.darkPurple))
                             : const Icon(Symbols.stars, size: 100, color: AppColors.darkPurple),
                       ),
                       const SizedBox(height: 20),
+                      // รายละเอียดลายผ้า
                       Text(description, style: const TextStyle(fontSize: 16, height: 1.6)),
                       const SizedBox(height: 30),
+                      //ปุ่ม
                       NavButton(
                         label: 'สถานที่ท่องเที่ยวแนะนำ',
                         onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => SubListScreen(provinceId: provinceId, collectionName: 'attractions', pageTitle: 'สถานที่ท่องเที่ยวแนะนำ'))),

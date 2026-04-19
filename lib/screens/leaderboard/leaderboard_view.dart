@@ -4,11 +4,13 @@ import '../../core/constants.dart';
 import '../../core/app_state.dart';
 import '../../widgets/shared_widgets.dart';
 
+/// Leaderboard View
 class LeaderboardView extends StatelessWidget {
   const LeaderboardView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // ดึง UID ของผู้ใช้งานปัจจุบัน เพื่อนำไปเปรียบเทียบและไฮไลต์แถวของตัวเอง
     final uid = firebaseAuth.currentUser?.uid ?? '';
 
     return Scaffold(
@@ -24,6 +26,8 @@ class LeaderboardView extends StatelessWidget {
               const SizedBox(height: 4),
               const Text('Top 10 ผู้สะสมแสตมป์มากที่สุด', style: TextStyle(color: AppColors.mediumPurple, fontSize: 14)),
               const SizedBox(height: 20),
+              // ใช้ ListenableBuilder ครอบเฉพาะส่วนแบนเนอร์คะแนนของตัวเอง
+              // เพื่อให้ UI อัปเดตเฉพาะจุดนี้จุดเดียวเมื่อจำนวนแสตมป์ของผู้ใช้เปลี่ยน
               ListenableBuilder(
                 listenable: appState,
                 builder: (context, _) {
@@ -34,6 +38,9 @@ class LeaderboardView extends StatelessWidget {
               const SizedBox(height: 25),
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
+                  // สร้าง Connection แบบ Real-time (WebSockets) ไปยัง Firestore
+                  // ใช้ .orderBy() เพื่อเรียงลำดับคะแนนจากมากไปน้อย 
+                  // และใช้ .limit(10) เพื่อจำกัดการดึงข้อมูล (Query Limit)
                   stream: firestoreDB.collection('users').orderBy('stampCount', descending: true).limit(10).snapshots(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());

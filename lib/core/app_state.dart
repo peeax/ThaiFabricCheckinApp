@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'constants.dart';
 
+
+/// คลาสจัดการสถานะ (State Management) ส่วนกลางของแอปพลิเคชัน
+/// สืบทอดจาก ChangeNotifier เพื่อแจ้งเตือน UI ให้วาดใหม่เฉพาะเมื่อข้อมูลมีการเปลี่ยนแปลง
 class AppStateManager extends ChangeNotifier {
   User? currentUser;
   Map<String, dynamic>? userData;
@@ -11,6 +14,7 @@ class AppStateManager extends ChangeNotifier {
 
   StreamSubscription<DocumentSnapshot>? _userDocSubscription;
 
+/// ฟังก์ชันเริ่มต้นดักจับการเข้าสู่ระบบ/ออกจากระบบของ Firebase Auth
   void initialize() {
     firebaseAuth.authStateChanges().listen(_onAuthStateChanged);
   }
@@ -22,13 +26,15 @@ class AppStateManager extends ChangeNotifier {
     if (user == null) {
       userData = null;
       isInitialized = true;
-      notifyListeners();
+      notifyListeners(); // แจ้ง UI ให้นำกลับไปหน้า Login
       return;
     }
 
     isInitialized = false;
-    notifyListeners();
+    notifyListeners(); // แจ้ง UI ให้แสดง Loading ระหว่างรอข้อมูลโปรไฟล์
 
+    // ดึงข้อมูล User จาก Firestore
+    // หากข้อมูลเปลี่ยนเช่น จำนวนแสตมป์เพิ่ม State จะอัปเดตอัตโนมัติ
     _userDocSubscription = firestoreDB
         .collection('users')
         .doc(user.uid)
@@ -53,6 +59,7 @@ class AppStateManager extends ChangeNotifier {
   }
 }
 
+/// คลาสจัดการสถานะเฉพาะหน้าจอแสตมป์
 class StampsManager extends ChangeNotifier {
   StampsManager({required this.uid}) {
     _initStreams();

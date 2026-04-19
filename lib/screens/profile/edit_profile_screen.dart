@@ -23,8 +23,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
+    // ดึงข้อมูลเดิมของผู้ใช้จาก appState มาแสดงในฟอร์ม 
+    // เพื่อให้ผู้ใช้ไม่ต้องพิมพ์ใหม่ทั้งหมด
     final data = appState.userData ?? {};
     _usernameController.text = data['username'] as String? ?? '';
+    // ข้อมูลวันที่ใน Firestore ถูกเก็บเป็นรูปแบบ 'Timestamp' 
+    // เราต้องแปลงให้กลับมาเป็น 'DateTime' ของภาษา Dart ก่อนนำไปใช้งานในแอป
     if (data['birthday'] != null) {
       _birthday = (data['birthday'] as Timestamp).toDate();
     }
@@ -36,7 +40,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+  /// ฟังก์ชันสำหรับบันทึกการแก้ไข
   Future<void> _saveChanges() async {
+    // ใช้ .trim() ตัดช่องว่างหัว-ท้าย ป้องกันผู้ใช้เผลอกด Spacebar
     final username = _usernameController.text.trim();
     if (username.isEmpty) {
       setState(() => _errorMessage = 'กรุณากรอกชื่อ');
@@ -49,11 +55,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
+      // เรียกใช้ Service Layer (Separation of Concerns) เพื่อพูดคุยกับ Firebase
       await UserService.updateProfile(
         uid: firebaseAuth.currentUser!.uid,
         username: username,
-        birthday: _birthday,
+        birthday: _birthday, // ถ้าผู้ใช้ไม่แก้ ค่านี้ก็จะเป็นค่าเดิมที่ดึงมาตอน initState
       );
+      // เมื่ออัปเดตสำเร็จ ให้ปิดหน้านี้และย้อนกลับไปหน้า Profile
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) setState(() => _errorMessage = 'บันทึกไม่สำเร็จ');

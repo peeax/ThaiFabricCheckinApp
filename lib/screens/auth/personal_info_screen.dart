@@ -17,34 +17,66 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   bool _isSaving = false;
   String _errorMessage = '';
 
+  // ต้องคืนหน่วยความจำ (Memory Management) ทุกครั้งเมื่อ Widget ถูกทำลาย
+  // เพื่อป้องกันปัญหา Memory Leak จากตัว Controller
   @override
-  void dispose() { _usernameController.dispose(); super.dispose(); }
+  void dispose() {
+    _usernameController.dispose();
+    super.dispose();
+  }
 
   String? _validateBirthday(DateTime date) {
     final age = DateTime.now().year - date.year;
+    // กำหนดเงื่อนไขอายุขั้นต่ำและสูงสุด
     if (age < 3) return 'ผู้ใช้ต้องอายุไม่น้อยกว่า 3 ปี';
     if (age > 120) return 'วันเกิดไม่ถูกต้อง';
     return null;
   }
 
+  /// ฟังก์ชันเปิดปฏิทินให้ผู้ใช้เลือกวันเกิด
   Future<void> _pickBirthday() async {
-    final picked = await showDatePicker(context: context, initialDate: DateTime(2000), firstDate: DateTime(1900), lastDate: DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
     if (picked != null) {
-      setState(() { _birthday = picked; _errorMessage = _validateBirthday(picked) ?? ''; });
+      setState(() {
+        _birthday = picked;
+        _errorMessage = _validateBirthday(picked) ?? '';
+      });
     }
   }
 
   Future<void> _saveProfile() async {
+    // การใช้ .trim() เพื่อตัดช่องว่างหน้า-หลัง ป้องกันผู้ใช้พิมพ์แค่ Spacebar
     final username = _usernameController.text.trim();
-    if (username.isEmpty) { setState(() => _errorMessage = 'กรุณากรอกชื่อ'); return; }
-    if (_birthday == null) { setState(() => _errorMessage = 'กรุณาเลือกวันเกิด'); return; }
+    if (username.isEmpty) {
+      setState(() => _errorMessage = 'กรุณากรอกชื่อ');
+      return;
+    }
+    if (_birthday == null) {
+      setState(() => _errorMessage = 'กรุณาเลือกวันเกิด');
+      return;
+    }
     final birthdayError = _validateBirthday(_birthday!);
-    if (birthdayError != null) { setState(() => _errorMessage = birthdayError); return; }
+    if (birthdayError != null) {
+      setState(() => _errorMessage = birthdayError);
+      return;
+    }
 
-    setState(() { _isSaving = true; _errorMessage = ''; });
+    setState(() {
+      _isSaving = true;
+      _errorMessage = '';
+    });
 
     try {
-      await UserService.createProfile(uid: firebaseAuth.currentUser!.uid, username: username, birthday: _birthday!);
+      await UserService.createProfile(
+        uid: firebaseAuth.currentUser!.uid,
+        username: username,
+        birthday: _birthday!,
+      );
     } catch (_) {
       if (mounted) setState(() => _errorMessage = 'บันทึกข้อมูลไม่สำเร็จ');
     } finally {
@@ -54,9 +86,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final birthdayDisplayText = _birthday != null ? DateFormat('dd/MM/yyyy').format(_birthday!) : 'เลือกวันเดือนปีเกิด';
+    // Date Formatting
+    final birthdayDisplayText = _birthday != null
+        ? DateFormat('dd/MM/yyyy').format(_birthday!)
+        : 'เลือกวันเดือนปีเกิด';
     return Scaffold(
       backgroundColor: AppColors.lightBackground,
+      // ดัน UI ขึ้นเมื่อคีย์บอร์ดแสดง เพื่อไม่ให้ปุ่มโดนบัง
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Padding(
@@ -65,19 +101,51 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 30),
-              GestureDetector(onTap: () => firebaseAuth.signOut(), child: const Icon(Symbols.arrow_back_ios_new, color: AppColors.darkPurple, size: 24)),
+              // ปุ่มย้อนกลับ ในกรณีนี้ถ้าผู้ใช้ไม่ต้องการกรอกโปรไฟล์ต่อ ให้ถือว่ายกเลิกการสมัคร
+              // จึงเรียกใช้ firebaseAuth.signOut() เพื่อเคลียร์ Session ทิ้ง ป้องกันข้อมูลผู้ใช้ค้างในระบบ (
+              GestureDetector(
+                onTap: () => firebaseAuth.signOut(),
+                child: const Icon(
+                  Symbols.arrow_back_ios_new,
+                  color: AppColors.darkPurple,
+                  size: 24,
+                ),
+              ),
               const SizedBox(height: 40),
-              const Text('ข้อมูลส่วนตัว', style: TextStyle(color: AppColors.darkPurple, fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text(
+                'ข้อมูลส่วนตัว',
+                style: TextStyle(
+                  color: AppColors.darkPurple,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 25),
               AppTextField(controller: _usernameController, hint: 'กรอกชื่อ'),
               const SizedBox(height: 15),
-              DatePickerField(label: birthdayDisplayText, hasValue: _birthday != null, onTap: _pickBirthday),
+              DatePickerField(
+                label: birthdayDisplayText,
+                hasValue: _birthday != null,
+                onTap: _pickBirthday,
+              ),
+
+              // แสดงข้อความแจ้งเตือนเฉพาะเมื่อมี Error
               if (_errorMessage.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(_errorMessage, style: const TextStyle(color: AppColors.errorRed, fontSize: 12)),
+                Text(
+                  _errorMessage,
+                  style: const TextStyle(
+                    color: AppColors.errorRed,
+                    fontSize: 12,
+                  ),
+                ),
               ],
               const Spacer(),
-              AppButton(label: 'ถัดไป', isLoading: _isSaving, onTap: _saveProfile),
+              AppButton(
+                label: 'ถัดไป',
+                isLoading: _isSaving,
+                onTap: _saveProfile,
+              ),
               const SizedBox(height: 30),
             ],
           ),

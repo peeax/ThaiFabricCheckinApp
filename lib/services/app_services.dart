@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/constants.dart';
 
+/// ชั้นของ Service (Service Layer) สำหรับจัดการ Firebase Auth
+/// ช่วยให้ง่ายต่อการนำไปเขียน Unit Test
 class AuthService {
   AuthService._();
 
@@ -38,6 +40,7 @@ class AuthService {
   }
 }
 
+/// Service สำหรับจัดการข้อมูลผู้ใช้ (CRUD Operations บน Firestore)
 class UserService {
   UserService._();
 
@@ -77,6 +80,7 @@ class UserService {
   }
 }
 
+/// Service จัดการเรื่องตำแหน่ง (GPS และ Geocoding)
 class LocationService {
   LocationService._();
 
@@ -90,7 +94,7 @@ class LocationService {
         permission == LocationPermission.deniedForever) {
       throw Exception('ไม่อนุญาตการเข้าถึงตำแหน่ง');
     }
-
+    // ดึงพิกัดพร้อมตั้งเวลา Timeout ป้องกันแอพค้างหากอับสัญญาณ GPS
     return Geolocator.getCurrentPosition(timeLimit: const Duration(seconds: 15));
   }
 
@@ -102,6 +106,7 @@ class LocationService {
   }
 }
 
+/// Service สำหรับจัดการการเช็คอิน
 class CheckInService {
   CheckInService._();
 
@@ -120,6 +125,7 @@ class CheckInService {
 
         transaction.set(checkInRef, {...provinceData, 'at': FieldValue.serverTimestamp()});
         transaction.update(firestoreDB.collection('users').doc(uid), {
+          // อัปเดตยอดรวมแสตมป์
           'stampCount': FieldValue.increment(1),
         });
       });
@@ -134,11 +140,12 @@ class CheckInService {
 
 class AdminService {
   AdminService._();
-
+  /// ฟังก์ชันซิงค์ข้อมูล Mock Data (JSON) ขึ้น Firestore
   static Future<void> syncProvincesFromJson() async {
     try {
       final rawJson = await rootBundle.loadString('assets/data/provinces.json');
       final provinceMap = json.decode(rawJson) as Map<String, dynamic>;
+      // ใช้ Batch Write เพื่ออัปโหลดข้อมูลทีละมากๆ ใน Request เดียว (ช่วยลดค่าใช้จ่าย Firestore Reads/Writes)
       final batch = firestoreDB.batch();
 
       for (final entry in provinceMap.entries) {
@@ -162,7 +169,7 @@ class AdminService {
           }
         }
       }
-      await batch.commit();
+      await batch.commit(); // ประมวลผลและส่งขึ้นฐานข้อมูล
     } catch (e, s) {
       AppLog.error('Sync provinces failed', e, s);
       rethrow;
@@ -170,6 +177,7 @@ class AdminService {
   }
 }
 
+/// Service จัดการเชื่อมต่อกับ TAT API (การท่องเที่ยวแห่งประเทศไทย)
 class TatApiService {
   TatApiService._();
 
@@ -177,6 +185,7 @@ class TatApiService {
   static const String _placesPath = '/api/v2/places';
   static const String _eventsPath = '/api/v2/events';
   static const Duration _requestTimeout = Duration(seconds: 15);
+  // ใช้ระบบ In-memory Cache เก็บข้อมูลไว้ชั่วคราว
   static const Duration _cacheDuration = Duration(minutes: 5);
   static final Map<String, List<dynamic>> _attractionsCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
