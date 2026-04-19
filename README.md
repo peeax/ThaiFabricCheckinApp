@@ -6,6 +6,20 @@
  - เยี่ยมชมสินค้า OTOP ประจำจังหวัด<br>
  - ดูรายการอีเวนต์ที่กำลังจะจัดขึ้น อีเวนต์ที่ผ่านมาแล้วในจังหวัดนั้น<br><br>
 
+1. ในการเรียกใช้บริการ ผู้ใช้ต้องติดตั้ง module ทั้งหมดใน pubspec.yaml โดยเปิด terminal และใช้คำสั่ง
+```bash
+flutter pub get
+```
+2. ในการเรียกใช้ api ผู้ใช้ต้องกรอก api โดยเราได้เตรียมโค้ด api ไว้ให้สามารถเข้าถึงได้จากไฟล์ต่อไปนี้
+https://drive.google.com/file/d/1qbuAgKhOuPvVhwp2VZllCMPwZzSQ3HdY/view?usp=sharing
+
+3. นำ api ทั้ง 2 api จากไฟล์ข้างต้นมากรอกในไฟล์ .env ให้เสร็จสิ้น
+4. ทำการ run แอปพลิเคชันโดยแนะนำให้ใช้มือถือจริงในการ run แอพพลิเคชัน เนื่องจากต้องใช้ geolocation และ gps จากอุปกรณ์มือถือ
+   เปิด terminal และใช้คำสั่ง
+```bash
+flutter run
+```
+
  Snapshot of the App:<br>
  <img src="https://i.ibb.co/j90VGGvr/IMG-7376.jpg" width="200">
  <img src="https://i.ibb.co/mFRTCSPP/IMG-7402.jpg" width="200">
