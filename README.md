@@ -8,13 +8,6 @@
 
  Snapshot of the App:<br>
  <img src="https://img2.pic.in.th/IMG_7532.jpeg" width="50">
-![App Screen 1](https://img2.pic.in.th/IMG_7532.jpeg)
-![App Screen 2](https://img1.pic.in.th/images/IMG_7531.jpeg)
-![App Screen 3](https://img1.pic.in.th/images/IMG_7530.jpeg)
-![App Screen 4](https://img1.pic.in.th/images/IMG_7529.jpeg)
-![App Screen 5](https://img1.pic.in.th/images/IMG_7526.jpeg)
-![App Screen 6](https://img2.pic.in.th/IMG_7376.jpeg)
-![App Screen 7](https://img2.pic.in.th/IMG_7402.jpeg)
 
 
 
