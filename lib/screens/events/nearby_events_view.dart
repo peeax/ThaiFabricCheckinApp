@@ -167,8 +167,8 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
             Expanded(
               child: _isLoadingLocation
                   ? const Center(child: CircularProgressIndicator())
-                  : FutureBuilder<List<dynamic>>(
-                      future: TatApiService.fetchEventsByProvince(
+                  : FutureBuilder<List<Map<String, dynamic>>>(
+                      future: EventService.fetchPublishedEventsByProvince(
                         _currentProvince,
                       ),
                       builder: (context, snapshot) {
@@ -179,9 +179,11 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
                           );
                         }
 
-                        if (snapshot.hasError ||
-                            !snapshot.hasData ||
-                            snapshot.data!.isEmpty) {
+                        if (snapshot.hasError) {
+                          return _buildEventsErrorState();
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
                           return _buildEmptyEventsState(_currentProvince);
                         }
 
@@ -203,9 +205,7 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
                               _buildEmptyEventsState(_currentProvince)
                             else
                               ...activeEvents.map(
-                                (event) => _EventCard(
-                                  event: event as Map<String, dynamic>,
-                                ),
+                                (event) => _EventCard(event: event),
                               ),
 
                             if (pastEvents.isNotEmpty) ...[
@@ -223,9 +223,7 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
                               ...pastEvents.map(
                                 (event) => Opacity(
                                   opacity: 0.6,
-                                  child: _EventCard(
-                                    event: event as Map<String, dynamic>,
-                                  ),
+                                  child: _EventCard(event: event),
                                 ),
                               ),
                             ],
@@ -252,6 +250,26 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
             style: const TextStyle(color: Colors.grey),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEventsErrorState() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Symbols.cloud_off, size: 50, color: Colors.grey),
+            SizedBox(height: 10),
+            Text(
+              'ยังโหลดข้อมูลอีเวนต์ไม่ได้ กรุณาลองใหม่อีกครั้งภายหลัง',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -291,7 +309,7 @@ class _EventCard extends StatelessWidget {
                   height: 150,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (context, error, stackTrace) =>
                       Container(height: 150, color: AppColors.darkPurple),
                 ),
               ),

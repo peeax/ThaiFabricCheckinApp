@@ -140,6 +140,13 @@ class CheckInService {
 
 class AdminService {
   AdminService._();
+
+  static Future<List<String>> loadProvinceNames() async {
+    final rawJson = await rootBundle.loadString('assets/data/provinces.json');
+    final provinceMap = json.decode(rawJson) as Map<String, dynamic>;
+    return provinceMap.keys.toList()..sort();
+  }
+
   /// ฟังก์ชันซิงค์ข้อมูล Mock Data (JSON) ขึ้น Firestore
   static Future<void> syncProvincesFromJson() async {
     try {
@@ -175,6 +182,140 @@ class AdminService {
       rethrow;
     }
   }
+}
+
+/// Service สำหรับอ่านอีเวนต์ที่เผยแพร่แล้วจาก Firestore
+class EventService {
+  EventService._();
+
+  static Stream<List<Map<String, dynamic>>> watchAdminEvents() {
+    return firestoreDB.collection('events').snapshots().map((snapshot) {
+      final events = snapshot.docs
+          .map((doc) => _normalizeEventData(doc.id, doc.data()))
+          .toList();
+      events.sort((a, b) {
+        final aDate = _parseEventDate(a['updatedAt']) ?? _parseEventDate(a['startDate']);
+        final bDate = _parseEventDate(b['updatedAt']) ?? _parseEventDate(b['startDate']);
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
+      return events;
+    });
+  }
+
+  static Future<void> saveEvent({
+    String? eventId,
+    required Map<String, dynamic> data,
+    required String previousStatus,
+  }) async {
+    final user = firebaseAuth.currentUser;
+    if (user == null) throw Exception('กรุณาเข้าสู่ระบบอีกครั้ง');
+
+    final ref = eventId == null
+        ? firestoreDB.collection('events').doc()
+        : firestoreDB.collection('events').doc(eventId);
+    final status = data['status']?.toString() ?? 'draft';
+    final payload = <String, dynamic>{
+      ...data,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': user.uid,
+      if (eventId == null) 'createdAt': FieldValue.serverTimestamp(),
+      if (eventId == null) 'createdBy': user.uid,
+      if (status == 'published' && previousStatus != 'published')
+        'publishedAt': FieldValue.serverTimestamp(),
+    };
+
+    await ref.set(payload, SetOptions(merge: eventId != null));
+  }
+
+  static Future<void> updateEventStatus(String eventId, String status) async {
+    final user = firebaseAuth.currentUser;
+    if (user == null) throw Exception('กรุณาเข้าสู่ระบบอีกครั้ง');
+
+    await firestoreDB.collection('events').doc(eventId).update({
+      'status': status,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': user.uid,
+      if (status == 'published') 'publishedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchPublishedEventsByProvince(
+    String provinceName,
+  ) async {
+    final normalizedProvince = _normalizeProvinceName(provinceName);
+
+    try {
+      final snapshot = await firestoreDB
+          .collection('events')
+          .where('province', isEqualTo: normalizedProvince)
+          .where('status', isEqualTo: 'published')
+          .get();
+
+      final events = snapshot.docs
+          .map((doc) => _normalizeEventData(doc.id, doc.data()))
+          .where((event) => event['status'] == 'published')
+          .toList();
+
+      events.sort((a, b) {
+        final aDate = _parseEventDate(a['startDate']);
+        final bDate = _parseEventDate(b['startDate']);
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return aDate.compareTo(bDate);
+      });
+
+      return events;
+    } catch (e, s) {
+      AppLog.error('Fetch Firestore events failed', e, s);
+      throw Exception('ไม่สามารถโหลดข้อมูลอีเวนต์ได้');
+    }
+  }
+
+  static Map<String, dynamic> _normalizeEventData(
+    String id,
+    Map<String, dynamic> data,
+  ) {
+    final title = data['title'] ?? data['name'] ?? '';
+    final description = data['description'] ?? data['introduction'] ?? '';
+    final imageUrl = data['imageUrl'] ?? data['thumbnailUrl'] ?? '';
+    final locationName = data['locationName'] ?? data['location'] ?? '';
+
+    return {
+      ...data,
+      'id': id,
+      'name': title.toString(),
+      'introduction': description.toString(),
+      'thumbnailUrl': imageUrl.toString(),
+      'locationName': locationName.toString(),
+      'startDate': _formatEventDateValue(data['startDate']),
+      'endDate': _formatEventDateValue(data['endDate']),
+      'updatedAt': _formatEventDateValue(data['updatedAt']),
+      'status': (data['status'] ?? '').toString(),
+      'sourceUrl': (data['sourceUrl'] ?? '').toString(),
+      'sourceName': (data['sourceName'] ?? '').toString(),
+    };
+  }
+
+  static String _formatEventDateValue(dynamic value) {
+    if (value == null) return '';
+    if (value is Timestamp) return value.toDate().toIso8601String();
+    if (value is DateTime) return value.toIso8601String();
+    return value.toString();
+  }
+
+  static DateTime? _parseEventDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return DateTime.tryParse(value.toString());
+  }
+
+  static String _normalizeProvinceName(String name) =>
+      name.replaceAll('จังหวัด', '').replaceAll('จ.', '').trim();
 }
 
 /// Service จัดการเชื่อมต่อกับ TAT API (การท่องเที่ยวแห่งประเทศไทย)

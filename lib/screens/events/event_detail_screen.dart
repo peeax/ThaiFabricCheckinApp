@@ -18,6 +18,13 @@ class EventDetailScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _openSourceUrl(String sourceUrl) async {
+    final uri = Uri.tryParse(sourceUrl);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = eventData['name'] as String? ?? 'ไม่มีชื่องาน';
@@ -30,6 +37,9 @@ class EventDetailScreen extends StatelessWidget {
         : '';
     final startDateText = _formatEventDate(eventData['startDate'] as String?);
     final endDateText = _formatEventDate(eventData['endDate'] as String?);
+    final locationName = eventData['locationName'] as String? ?? '';
+    final sourceUrl = eventData['sourceUrl'] as String? ?? '';
+    final sourceName = eventData['sourceName'] as String? ?? '';
 
     // ประกาศตัวแปร lat, lng เพื่อนำไปใช้เปิดแผนที่
     final lat = eventData['latitude']?.toString() ?? '';
@@ -98,6 +108,29 @@ class EventDetailScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                  if (locationName.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Symbols.location_on,
+                          size: 18,
+                          color: AppColors.mediumPurple,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            locationName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.mediumPurple,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   const Text(
                     'รายละเอียดกิจกรรม',
@@ -125,6 +158,15 @@ class EventDetailScreen extends StatelessWidget {
                         lng,
                       ), // เรียกใช้งานฟังก์ชันที่สร้างไว้ด้านบน
                     ),
+                  if (sourceUrl.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    AppButton(
+                      label: sourceName.isEmpty
+                          ? 'เปิดแหล่งข้อมูล'
+                          : 'เปิดแหล่งข้อมูล: $sourceName',
+                      onTap: () => _openSourceUrl(sourceUrl),
+                    ),
+                  ],
                 ],
               ),
             ),

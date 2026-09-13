@@ -1,0 +1,6 @@
+node_modules/
+coverage/
+dry-run-output.json
+*.traineddata
+service-account*.json
+.env

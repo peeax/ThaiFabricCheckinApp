@@ -6,6 +6,7 @@ import '../../core/constants.dart';
 import '../../core/app_state.dart';
 import '../../services/app_services.dart';
 import '../../widgets/shared_widgets.dart';
+import '../admin/admin_events_screen.dart';
 import 'edit_profile_screen.dart';
 import 'faq_screen.dart';
 
@@ -145,6 +146,52 @@ class _ProfileViewState extends State<ProfileView> {
                     ),
                   ],
                 ),
+                if (isAdmin)
+                  ProfileSection(
+                    title: 'ผู้ดูแลระบบ',
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AdminEventsScreen(),
+                          ),
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('จัดการอีเวนต์'),
+                              Icon(Symbols.chevron_right),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 24),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _isSyncing ? null : _syncProvinces,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('ซิงค์ข้อมูลจังหวัด'),
+                              _isSyncing
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Symbols.sync),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 30),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 25),
@@ -153,19 +200,6 @@ class _ProfileViewState extends State<ProfileView> {
                     onTap: () => firebaseAuth.signOut(),
                   ),
                 ),
-                if (isAdmin) ...[
-                  const SizedBox(height: 15),
-                  _isSyncing
-                      ? const CircularProgressIndicator()
-                      : TextButton.icon(
-                          onPressed: _syncProvinces,
-                          icon: const Icon(Symbols.sync, size: 14),
-                          label: const Text(
-                            'Admin: Sync ข้อมูลจังหวัด',
-                            style: TextStyle(fontSize: 11, color: Colors.grey),
-                          ),
-                        ),
-                ],
                 const SizedBox(height: 50),
               ],
             ),
