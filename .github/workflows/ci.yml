@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+        working-directory: functions
+      - run: npm run build
+        working-directory: functions
+      - run: npm audit --omit=dev
+        working-directory: functions
+      - run: npm test -- --exclude test/firestore.rules.test.ts
+        working-directory: functions
+      - run: npx firebase-tools emulators:exec --only firestore --project demo-aewmai "npm --prefix functions run test:rules"
+
+  importer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: event_importer/package-lock.json
+      - run: npm ci
+        working-directory: event_importer
+      - run: npm audit --omit=dev
+        working-directory: event_importer
+      - run: npm run typecheck
+        working-directory: event_importer
+      - run: npm test
+        working-directory: event_importer

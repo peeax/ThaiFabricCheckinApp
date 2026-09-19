@@ -6,31 +6,77 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function ownsUser(userId) {
+    function owns(userId) {
       return signedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return signedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function validUsername(value) {
+      return value is string && value.size() >= 1 && value.size() <= 60;
+    }
+
+    function validPrivateProfileCreate(userId) {
+      return owns(userId)
+        && request.resource.data.keys().hasOnly([
+          'username', 'birthday', 'stampCount', 'isAdmin', 'createdAt'
+        ])
+        && validUsername(request.resource.data.username)
+        && request.resource.data.birthday is timestamp
+        && request.resource.data.stampCount == 0
+        && request.resource.data.isAdmin == false
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    function validPrivateProfileUpdate(userId) {
+      return owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'username', 'birthday', 'updatedAt'
+        ])
+        && validUsername(request.resource.data.username)
+        && request.resource.data.birthday is timestamp
+        && request.resource.data.stampCount == resource.data.stampCount
+        && request.resource.data.isAdmin == resource.data.isAdmin;
+    }
+
+    function validLeaderboardCreate(userId) {
+      return owns(userId)
+        && request.resource.data.keys().hasOnly([
+          'username', 'avatarUrl', 'stampCount', 'updatedAt'
+        ])
+        && validUsername(request.resource.data.username)
+        && request.resource.data.stampCount == 0
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    function validLeaderboardUpdate(userId) {
+      return owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'username', 'avatarUrl', 'updatedAt'
+        ])
+        && validUsername(request.resource.data.username)
+        && request.resource.data.stampCount == resource.data.stampCount;
     }
 
     match /users/{userId} {
-      allow read: if signedIn();
-
-      allow create: if ownsUser(userId)
-        && request.resource.data.isAdmin == false;
-
-      allow update: if (
-          ownsUser(userId)
-          && request.resource.data.isAdmin == resource.data.isAdmin
-        ) || isAdmin();
-
-      allow delete: if ownsUser(userId) || isAdmin();
+      allow read: if owns(userId) || isAdmin();
+      allow create: if validPrivateProfileCreate(userId) || isAdmin();
+      allow update: if validPrivateProfileUpdate(userId) || isAdmin();
+      allow delete: if isAdmin();
 
       match /checkins/{provinceId} {
-        allow read, write: if ownsUser(userId);
+        allow read: if owns(userId) || isAdmin();
+        allow write: if false;
       }
+    }
+
+    match /leaderboardProfiles/{userId} {
+      allow read: if signedIn();
+      allow create: if validLeaderboardCreate(userId) || isAdmin();
+      allow update: if validLeaderboardUpdate(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /provinces/{provinceId} {
@@ -46,7 +92,20 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.status == 'published');
-      allow write: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.status in ['draft', 'published', 'archived']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3
+        && request.resource.data.title.size() <= 200;
+      allow delete: if isAdmin();
+    }
+
+    match /attractionCache/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /checkInRateLimits/{document=**} {
+      allow read, write: if false;
     }
   }
 }
