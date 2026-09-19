@@ -23,7 +23,7 @@ class SubListScreen extends StatelessWidget {
   Future<List<dynamic>> _fetchItems() async {
     if (collectionName == 'otopProducts' && otopData != null) return otopData!;
     if (collectionName == 'attractions')
-      return TatApiService.fetchAttractionsByProvince(provinceId);
+      return AttractionService.fetchAttractionsByProvince(provinceId);
 
     final snapshot = await firestoreDB
         .collection('provinces')

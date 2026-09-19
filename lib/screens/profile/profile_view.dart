@@ -53,7 +53,7 @@ class _ProfileViewState extends State<ProfileView> {
           final data = appState.userData ?? {};
           final stampCount = data['stampCount'] as int? ?? 0;
           final username = data['username'] as String? ?? '';
-          final isAdmin = data['isAdmin'] as bool? ?? false;
+          final isAdmin = appState.isAdmin;
           final email = firebaseAuth.currentUser?.email ?? '-';
           final achievementPercent =
               ((stampCount / AppStrings.totalProvinces) * 100).toInt();

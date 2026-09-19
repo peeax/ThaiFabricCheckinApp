@@ -20,7 +20,7 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   String _query = '';
   String? _province;
 
-  bool get _isAdmin => appState.userData?['isAdmin'] == true;
+  bool get _isAdmin => appState.isAdmin;
 
   @override
   Widget build(BuildContext context) {

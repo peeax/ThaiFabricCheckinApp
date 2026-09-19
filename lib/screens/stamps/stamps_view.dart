@@ -38,7 +38,7 @@ class _StampsViewState extends State<StampsView> {
         final data = appState.userData ?? {};
         final stampCount = data['stampCount'] as int? ?? 0;
         // ดึงสิทธิ์ Admin มาตรวจสอบ ถ้าเป็น Admin จะอนุญาตให้ดูแสตมป์ได้ทุกดวงโดยไม่ต้องเช็คอินจริง (สำหรับตรวจงาน)
-        final isAdmin = data['isAdmin'] as bool? ?? false;
+        final isAdmin = appState.isAdmin;
 
         return Scaffold(
           backgroundColor: AppColors.lightBackground,

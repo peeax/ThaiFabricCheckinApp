@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/constants.dart';
+
+final FirebaseFunctions cloudFunctions = FirebaseFunctions.instanceFor(
+  region: 'asia-southeast1',
+);
 
 /// ชั้นของ Service (Service Layer) สำหรับจัดการ Firebase Auth
 /// ช่วยให้ง่ายต่อการนำไปเขียน Unit Test
@@ -50,13 +53,25 @@ class UserService {
     required DateTime birthday,
   }) async {
     try {
-      await firestoreDB.collection('users').doc(uid).set({
+      final batch = firestoreDB.batch();
+      final userRef = firestoreDB.collection('users').doc(uid);
+      final leaderboardRef = firestoreDB
+          .collection('leaderboardProfiles')
+          .doc(uid);
+      batch.set(userRef, {
         'username': username,
         'birthday': birthday,
         'stampCount': 0,
+        // Kept during the custom-claim migration; security rules ignore it.
         'isAdmin': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
+      batch.set(leaderboardRef, {
+        'username': username,
+        'stampCount': 0,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
     } catch (e, s) {
       AppLog.error('Create profile failed', e, s);
       rethrow;
@@ -69,10 +84,21 @@ class UserService {
     DateTime? birthday,
   }) async {
     try {
-      await firestoreDB.collection('users').doc(uid).update({
+      final batch = firestoreDB.batch();
+      batch.update(firestoreDB.collection('users').doc(uid), {
         'username': username,
         if (birthday != null) 'birthday': birthday,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
+      batch.set(
+        firestoreDB.collection('leaderboardProfiles').doc(uid),
+        {
+          'username': username,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+      await batch.commit();
     } catch (e, s) {
       AppLog.error('Update profile failed', e, s);
       rethrow;
@@ -110,32 +136,40 @@ class LocationService {
 class CheckInService {
   CheckInService._();
 
-  static Future<Map<String, dynamic>> checkIn({required String uid, required String provinceName}) async {
+  static Future<Map<String, dynamic>> checkIn({
+    required String provinceName,
+    required double latitude,
+    required double longitude,
+    required double accuracyMeters,
+    required bool isMocked,
+  }) async {
     try {
-      final provinceDoc = await firestoreDB.collection('provinces').doc(provinceName).get();
-      if (!provinceDoc.exists) throw Exception('ยังไม่เปิดให้เช็คอินที่จังหวัดนี้');
-
-      final provinceData = provinceDoc.data()!;
-
-      await firestoreDB.runTransaction((transaction) async {
-        final checkInRef = firestoreDB.collection('users').doc(uid).collection('checkins').doc(provinceName);
-        final existingCheckIn = await transaction.get(checkInRef);
-
-        if (existingCheckIn.exists) throw Exception('เช็คอินจังหวัดนี้เรียบร้อยแล้ว');
-
-        transaction.set(checkInRef, {...provinceData, 'at': FieldValue.serverTimestamp()});
-        transaction.update(firestoreDB.collection('users').doc(uid), {
-          // อัปเดตยอดรวมแสตมป์
-          'stampCount': FieldValue.increment(1),
-        });
+      final callable = cloudFunctions.httpsCallable('checkInProvince');
+      final result = await callable.call<Map<String, dynamic>>({
+        'provinceName': provinceName,
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracyMeters': accuracyMeters,
+        'isMocked': isMocked,
       });
-
-      return provinceData;
+      final payload = Map<String, dynamic>.from(result.data);
+      return Map<String, dynamic>.from(payload['province'] as Map);
+    } on FirebaseFunctionsException catch (e, s) {
+      AppLog.error('Server check-in failed', e, s);
+      throw Exception(_checkInErrorMessage(e.code));
     } catch (e, s) {
       AppLog.error('Check-in transaction failed', e, s);
       rethrow;
     }
   }
+
+  static String _checkInErrorMessage(String code) => switch (code) {
+    'already-exists' => 'เช็คอินจังหวัดนี้เรียบร้อยแล้ว',
+    'failed-precondition' => 'ตำแหน่งไม่ตรงกับจังหวัดหรือความแม่นยำไม่เพียงพอ',
+    'resource-exhausted' => 'ลองเช็คอินถี่เกินไป กรุณารอสักครู่',
+    'unauthenticated' => 'กรุณาเข้าสู่ระบบอีกครั้ง',
+    _ => 'ไม่สามารถเช็คอินได้ กรุณาลองใหม่',
+  };
 }
 
 class AdminService {
@@ -318,62 +352,19 @@ class EventService {
       name.replaceAll('จังหวัด', '').replaceAll('จ.', '').trim();
 }
 
-/// Service จัดการเชื่อมต่อกับ TAT API (การท่องเที่ยวแห่งประเทศไทย)
-class TatApiService {
-  TatApiService._();
-
-  static const String _baseHost = 'tatdataapi.io';
-  static const String _placesPath = '/api/v2/places';
-  static const String _eventsPath = '/api/v2/events';
-  static const Duration _requestTimeout = Duration(seconds: 15);
-  // ใช้ระบบ In-memory Cache เก็บข้อมูลไว้ชั่วคราว
-  static const Duration _cacheDuration = Duration(minutes: 5);
-  static final Map<String, List<dynamic>> _attractionsCache = {};
-  static final Map<String, DateTime> _cacheTimestamps = {};
-
-  static String get _apiKey => dotenv.env['TAT_API_KEY'] ?? '';
-  static Map<String, String> get _requestHeaders => {'x-api-key': _apiKey, 'Accept-Language': 'th'};
+class AttractionService {
+  AttractionService._();
 
   static Future<List<dynamic>> fetchAttractionsByProvince(String provinceName) async {
-    final keyword = _normalizeProvinceName(provinceName);
-    final cachedAt = _cacheTimestamps[keyword];
-    if (cachedAt != null && DateTime.now().difference(cachedAt) <= _cacheDuration) {
-      return _attractionsCache[keyword] ?? [];
-    }
-
     try {
-      final uri = Uri.https(_baseHost, _placesPath, {'keyword': keyword, 'limit': '20'});
-      final response = await http.get(uri, headers: _requestHeaders).timeout(_requestTimeout);
-
-      if (response.statusCode == 200) {
-        final body = json.decode(response.body) as Map<String, dynamic>;
-        final places = (body['data'] as List?) ?? [];
-        _attractionsCache[keyword] = places;
-        _cacheTimestamps[keyword] = DateTime.now();
-        return places;
-      }
-      throw Exception('TAT API error: ${response.statusCode}');
+      final callable = cloudFunctions.httpsCallable('fetchAttractions');
+      final result = await callable.call<Map<String, dynamic>>({
+        'provinceName': provinceName,
+      });
+      return List<dynamic>.from(result.data['items'] as List? ?? const []);
     } catch (e, s) {
       AppLog.error('Fetch attractions failed', e, s);
       throw Exception('ไม่สามารถโหลดข้อมูลสถานที่ท่องเที่ยวได้');
     }
   }
-
-  static Future<List<dynamic>> fetchEventsByProvince(String provinceName) async {
-    final keyword = _normalizeProvinceName(provinceName);
-    try {
-      final uri = Uri.https(_baseHost, _eventsPath, {'keyword': keyword, 'limit': '30'});
-      final response = await http.get(uri, headers: _requestHeaders).timeout(_requestTimeout);
-      if (response.statusCode == 200) {
-        final body = json.decode(response.body) as Map<String, dynamic>;
-        return (body['data'] as List?) ?? [];
-      }
-      throw Exception('TAT API error: ${response.statusCode}');
-    } catch (e, s) {
-      AppLog.error('Fetch events failed', e, s);
-      throw Exception('ไม่สามารถโหลดข้อมูลอีเวนต์ได้');
-    }
-  }
-
-  static String _normalizeProvinceName(String name) => name.replaceAll('จังหวัด', '').replaceAll('จ.', '').trim();
 }

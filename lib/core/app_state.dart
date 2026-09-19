@@ -10,21 +10,27 @@ import 'constants.dart';
 class AppStateManager extends ChangeNotifier {
   User? currentUser;
   Map<String, dynamic>? userData;
+  bool isAdmin = false;
   bool isInitialized = false;
 
+  StreamSubscription<User?>? _authSubscription;
   StreamSubscription<DocumentSnapshot>? _userDocSubscription;
 
 /// ฟังก์ชันเริ่มต้นดักจับการเข้าสู่ระบบ/ออกจากระบบของ Firebase Auth
   void initialize() {
-    firebaseAuth.authStateChanges().listen(_onAuthStateChanged);
+    _authSubscription ??= firebaseAuth.authStateChanges().listen(
+      (user) => unawaited(_onAuthStateChanged(user)),
+    );
   }
 
-  void _onAuthStateChanged(User? user) {
+  Future<void> _onAuthStateChanged(User? user) async {
     currentUser = user;
-    _userDocSubscription?.cancel();
+    await _userDocSubscription?.cancel();
+    _userDocSubscription = null;
 
     if (user == null) {
       userData = null;
+      isAdmin = false;
       isInitialized = true;
       notifyListeners(); // แจ้ง UI ให้นำกลับไปหน้า Login
       return;
@@ -32,6 +38,15 @@ class AppStateManager extends ChangeNotifier {
 
     isInitialized = false;
     notifyListeners(); // แจ้ง UI ให้แสดง Loading ระหว่างรอข้อมูลโปรไฟล์
+
+    try {
+      final token = await user.getIdTokenResult(true);
+      if (currentUser?.uid != user.uid) return;
+      isAdmin = token.claims?['admin'] == true;
+    } catch (e, s) {
+      isAdmin = false;
+      AppLog.error('Admin claim refresh failed', e, s);
+    }
 
     // ดึงข้อมูล User จาก Firestore
     // หากข้อมูลเปลี่ยนเช่น จำนวนแสตมป์เพิ่ม State จะอัปเดตอัตโนมัติ
@@ -41,8 +56,11 @@ class AppStateManager extends ChangeNotifier {
         .snapshots()
         .listen(
           _onUserDocUpdated,
-          onError: (Object e, StackTrace s) =>
-              AppLog.error('User document stream error', e, s),
+          onError: (Object e, StackTrace s) {
+            isInitialized = true;
+            AppLog.error('User document stream error', e, s);
+            notifyListeners();
+          },
         );
   }
 
@@ -54,6 +72,7 @@ class AppStateManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _userDocSubscription?.cancel();
     super.dispose();
   }

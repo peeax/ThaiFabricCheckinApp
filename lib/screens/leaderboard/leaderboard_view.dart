@@ -41,7 +41,7 @@ class LeaderboardView extends StatelessWidget {
                   // สร้าง Connection แบบ Real-time (WebSockets) ไปยัง Firestore
                   // ใช้ .orderBy() เพื่อเรียงลำดับคะแนนจากมากไปน้อย 
                   // และใช้ .limit(10) เพื่อจำกัดการดึงข้อมูล (Query Limit)
-                  stream: firestoreDB.collection('users').orderBy('stampCount', descending: true).limit(10).snapshots(),
+                  stream: firestoreDB.collection('leaderboardProfiles').orderBy('stampCount', descending: true).limit(10).snapshots(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                     return ListView.builder(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/constants.dart';
 import 'core/app_state.dart';
@@ -9,8 +10,8 @@ import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await _activateAppCheck();
   appState.initialize();
   runApp(const AewMaiApp());
 }
@@ -37,5 +38,39 @@ class AewMaiApp extends StatelessWidget {
       ),
       home: const SplashScreen(),
     );
+  }
+}
+
+Future<void> _activateAppCheck() async {
+  if (kIsWeb) {
+    const siteKey = String.fromEnvironment('RECAPTCHA_V3_SITE_KEY');
+    if (siteKey.isNotEmpty) {
+      await FirebaseAppCheck.instance.activate(
+        providerWeb: ReCaptchaV3Provider(siteKey),
+      );
+    }
+    return;
+  }
+
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+      );
+      return;
+    case TargetPlatform.iOS:
+    case TargetPlatform.macOS:
+      await FirebaseAppCheck.instance.activate(
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestWithDeviceCheckFallbackProvider(),
+      );
+      return;
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
+    case TargetPlatform.fuchsia:
+      return;
   }
 }

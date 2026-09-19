@@ -20,6 +20,8 @@ class CheckInView extends StatefulWidget {
 class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
   GoogleMapController? _mapController;
   LatLng _currentPosition = const LatLng(13.7563, 100.5018);
+  double _currentAccuracy = double.infinity;
+  bool _isMockedLocation = false;
   String _detectedProvince = 'กำลังระบุตำแหน่ง...';
   bool _isCheckingIn = false;
   bool _hasLocationPermission = false;
@@ -105,6 +107,8 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
         if (mounted) {
           setState(() {
             _currentPosition = LatLng(position.latitude, position.longitude);
+            _currentAccuracy = position.accuracy;
+            _isMockedLocation = position.isMocked;
             _detectedProvince = province;
           });
           // เลื่อนแผนที่ไปยังตำแหน่งปัจจุบัน
@@ -132,14 +136,16 @@ class _CheckInViewState extends State<CheckInView> with WidgetsBindingObserver {
   }
 
   Future<void> _performCheckIn() async {
-    final uid = firebaseAuth.currentUser?.uid ?? '';
-    if (uid.isEmpty) return;
+    if (firebaseAuth.currentUser == null) return;
     setState(() => _isCheckingIn = true);
     try {
       // โยนหน้าที่การบันทึกลง Database ไปให้ Service Layer จัดการ
       final provinceData = await CheckInService.checkIn(
-        uid: uid,
         provinceName: _detectedProvince,
+        latitude: _currentPosition.latitude,
+        longitude: _currentPosition.longitude,
+        accuracyMeters: _currentAccuracy,
+        isMocked: _isMockedLocation,
       );
       if (mounted) _showCheckInSuccessDialog(_detectedProvince, provinceData);
     } catch (e) {
