@@ -67,14 +67,10 @@ class EventDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (thumbnailUrl.isNotEmpty)
-              Image.network(
-                thumbnailUrl,
+              AppCachedNetworkImage(
+                imageUrl: thumbnailUrl,
                 height: 250,
                 width: double.infinity,
-                fit: BoxFit.cover,
-                // แก้ Warning การใช้ _, __, ___
-                errorBuilder: (context, error, stackTrace) =>
-                    Container(height: 250, color: AppColors.darkPurple),
               ),
             Padding(
               padding: const EdgeInsets.all(24),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants.dart';
 import '../../services/app_services.dart';
+import '../../widgets/shared_widgets.dart';
 import 'event_detail_screen.dart';
 
 class NearbyEventsView extends StatefulWidget {
@@ -19,6 +21,12 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
 
   String _currentProvince = '';
   bool _isLoadingLocation = true; // State สำหรับจัดการ UX ระหว่างรอค้นหาพิกัด
+  bool _isLoadingEvents = false;
+  bool _isLoadingMore = false;
+  bool _hasMoreEvents = true;
+  String? _eventsError;
+  DocumentSnapshot<Map<String, dynamic>>? _lastEventDocument;
+  final List<Map<String, dynamic>> _events = [];
 
   @override
   void initState() {
@@ -79,6 +87,7 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
           _currentProvince = province;
           _isLoadingLocation = false;
         });
+        await _reloadEvents();
       }
     } catch (_) {
       // Error Handling หากเกิดข้อผิดพลาดใดๆ (ไม่ได้เปิด GPS, ไม่ให้สิทธิ์)
@@ -88,46 +97,47 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
           _currentProvince = _fallbackProvince;
           _isLoadingLocation = false;
         });
+        await _reloadEvents();
       }
     }
   }
 
-  /// คัดกรองเฉพาะอีเวนต์ที่ กำลังจัด หรือ ยังไม่หมดเวลา
-  List<dynamic> _filterActiveEvents(List<dynamic> events) {
-    final today = DateTime.now();
-    final todayDateOnly = DateTime(today.year, today.month, today.day);
-
-    return events.where((event) {
-      final endDateStr = event['endDate'] as String?;
-      if (endDateStr == null) return true;
-
-      try {
-        final endDate = DateTime.parse(endDateStr).toLocal();
-        final endDateOnly = DateTime(endDate.year, endDate.month, endDate.day);
-        return !endDateOnly.isBefore(todayDateOnly);
-      } catch (_) {
-        return true;
-      }
-    }).toList();
+  Future<void> _reloadEvents() async {
+    if (_currentProvince.isEmpty) return;
+    setState(() {
+      _isLoadingEvents = true;
+      _eventsError = null;
+      _hasMoreEvents = true;
+      _lastEventDocument = null;
+      _events.clear();
+    });
+    await _loadMoreEvents();
+    if (mounted) setState(() => _isLoadingEvents = false);
   }
 
-  /// Data Filtering คัดกรองเฉพาะอีเวนต์ที่ ผ่านมาแล้ว
-  List<dynamic> _filterPastEvents(List<dynamic> events) {
-    final today = DateTime.now();
-    final todayDateOnly = DateTime(today.year, today.month, today.day);
+  Future<void> _loadMoreEvents() async {
+    if (_isLoadingMore || !_hasMoreEvents || _currentProvince.isEmpty) return;
+    setState(() {
+      _isLoadingMore = true;
+      _eventsError = null;
+    });
 
-    return events.where((event) {
-      final endDateStr = event['endDate'] as String?;
-      if (endDateStr == null) return false;
-
-      try {
-        final endDate = DateTime.parse(endDateStr).toLocal();
-        final endDateOnly = DateTime(endDate.year, endDate.month, endDate.day);
-        return endDateOnly.isBefore(todayDateOnly);
-      } catch (_) {
-        return false;
-      }
-    }).toList();
+    try {
+      final page = await EventService.fetchPublishedEventsByProvincePage(
+        provinceName: _currentProvince,
+        startAfter: _lastEventDocument,
+      );
+      if (!mounted) return;
+      setState(() {
+        _events.addAll(page.events);
+        _lastEventDocument = page.lastDocument;
+        _hasMoreEvents = page.hasMore;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _eventsError = 'load-failed');
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
   }
 
   @override
@@ -167,74 +177,43 @@ class _NearbyEventsViewState extends State<NearbyEventsView>
             Expanded(
               child: _isLoadingLocation
                   ? const Center(child: CircularProgressIndicator())
-                  : FutureBuilder<List<Map<String, dynamic>>>(
-                      future: EventService.fetchPublishedEventsByProvince(
-                        _currentProvince,
-                      ),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return _buildEventsErrorState();
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return _buildEmptyEventsState(_currentProvince);
-                        }
-
-                        final allEvents = snapshot.data!;
-                        final activeEvents = _filterActiveEvents(allEvents);
-                        final pastEvents = _filterPastEvents(allEvents);
-
-                        if (activeEvents.isEmpty && pastEvents.isEmpty) {
-                          return _buildEmptyEventsState(_currentProvince);
-                        }
-
-                        return ListView(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 25,
-                            vertical: 10,
-                          ),
-                          children: [
-                            if (activeEvents.isEmpty)
-                              _buildEmptyEventsState(_currentProvince)
-                            else
-                              ...activeEvents.map(
-                                (event) => _EventCard(event: event),
-                              ),
-
-                            if (pastEvents.isNotEmpty) ...[
-                              const Padding(
-                                padding: EdgeInsets.only(top: 25, bottom: 15),
-                                child: Text(
-                                  'อีเวนต์ที่ผ่านมา',
-                                  style: TextStyle(
-                                    color: AppColors.darkPurple,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              ...pastEvents.map(
-                                (event) => Opacity(
-                                  opacity: 0.6,
-                                  child: _EventCard(event: event),
-                                ),
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
+                  : _buildEventsList(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildEventsList() {
+    if (_isLoadingEvents && _events.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_eventsError != null && _events.isEmpty) {
+      return _buildEventsErrorState();
+    }
+    if (_events.isEmpty) {
+      return _buildEmptyEventsState(_currentProvince);
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+      itemCount: _events.length + 1,
+      itemBuilder: (context, index) {
+        if (index == _events.length) {
+          if (_hasMoreEvents) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _loadMoreEvents();
+            });
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return const SizedBox(height: 18);
+        }
+        return _EventCard(event: _events[index]);
+      },
     );
   }
 
@@ -299,18 +278,12 @@ class _EventCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (thumbnailUrl.isNotEmpty)
-              ClipRRect(
+              AppCachedNetworkImage(
+                imageUrl: thumbnailUrl,
+                height: 150,
+                width: double.infinity,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(15),
-                ),
-                // ใช้ Image.network จัดการโหลดรูปภาพจากอินเทอร์เน็ต พร้อมดักจับ Error
-                child: Image.network(
-                  thumbnailUrl,
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      Container(height: 150, color: AppColors.darkPurple),
                 ),
               ),
             Padding(

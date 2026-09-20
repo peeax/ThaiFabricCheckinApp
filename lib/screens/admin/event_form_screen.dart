@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -190,20 +189,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
               ),
               if (_isHttpUrl(_imageUrlController.text)) ...[
                 const SizedBox(height: 10),
-                ClipRRect(
+                AppCachedNetworkImage(
+                  imageUrl: _imageUrlController.text.trim(),
+                  height: 170,
+                  width: double.infinity,
                   borderRadius: BorderRadius.circular(15),
-                  child: Image.network(
-                    _imageUrlController.text.trim(),
-                    height: 170,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      height: 100,
-                      alignment: Alignment.center,
-                      color: Colors.grey.shade100,
-                      child: const Text('ไม่สามารถแสดงตัวอย่างรูปได้'),
-                    ),
-                  ),
+                  placeholderColor: Colors.grey.shade100,
                 ),
               ],
               const SizedBox(height: 16),
@@ -409,8 +400,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'description': _descriptionController.text.trim(),
       'province': _province,
       'locationName': _locationController.text.trim(),
-      'startDate': Timestamp.fromDate(_startDate!),
-      'endDate': Timestamp.fromDate(_endDate!),
+      'startDate': _dateKey(_startDate!),
+      'endDate': _dateKey(_endDate!),
       'imageUrl': _imageUrlController.text.trim(),
       'sourceName': _sourceNameController.text.trim(),
       'sourceUrl': _sourceUrlController.text.trim(),
@@ -468,4 +459,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
+
+  String _dateKey(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }

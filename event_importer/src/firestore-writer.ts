@@ -1,4 +1,4 @@
-import { FieldValue, Firestore, Timestamp } from "@google-cloud/firestore";
+import { FieldValue, Firestore } from "@google-cloud/firestore";
 
 import { documentIdForFingerprint } from "./fingerprint.js";
 import type { EventCandidate } from "./types.js";
@@ -19,24 +19,20 @@ export async function writeDraftEvents(
   }
   const firestore = new Firestore({ projectId });
   const result: WriteResult = { created: 0, updated: 0, protected: 0 };
-  let writes = 0;
+  const selectedEvents = events.slice(0, maximumWrites);
+  const refs = selectedEvents.map((event) =>
+    firestore.collection("events").doc(documentIdForFingerprint(event.fingerprint)),
+  );
+  const existingSnapshots = await firestore.getAll(...refs);
+  const writer = firestore.bulkWriter();
 
-  for (const event of events) {
-    if (writes >= maximumWrites) break;
-    const deterministicRef = firestore
-      .collection("events")
-      .doc(documentIdForFingerprint(event.fingerprint));
-    const duplicate = await firestore
-      .collection("events")
-      .where("fingerprint", "==", event.fingerprint)
-      .limit(1)
-      .get();
-    const ref = duplicate.docs[0]?.ref ?? deterministicRef;
-    const existing = await ref.get();
+  for (const [index, event] of selectedEvents.entries()) {
+    const ref = refs[index]!;
+    const existing = existingSnapshots[index]!;
     const sourceSnapshot = serializeCandidate(event);
 
     if (!existing.exists) {
-      await ref.set({
+      writer.set(ref, {
         ...sourceSnapshot,
         status: "draft",
         createdAt: FieldValue.serverTimestamp(),
@@ -49,7 +45,6 @@ export async function writeDraftEvents(
         importerVersion: "0.1.0",
       });
       result.created += 1;
-      writes += 1;
       continue;
     }
 
@@ -58,17 +53,16 @@ export async function writeDraftEvents(
       current.status === "draft" &&
       String(current.updatedBy ?? "").startsWith("importer:");
     if (!importerOwnsDraft) {
-      await ref.update({
+      writer.update(ref, {
         lastSeenAt: FieldValue.serverTimestamp(),
         sourceSnapshot,
         importerVersion: "0.1.0",
       });
       result.protected += 1;
-      writes += 1;
       continue;
     }
 
-    await ref.update({
+    writer.update(ref, {
       ...sourceSnapshot,
       updatedAt: FieldValue.serverTimestamp(),
       lastSeenAt: FieldValue.serverTimestamp(),
@@ -77,16 +71,20 @@ export async function writeDraftEvents(
       importerVersion: "0.1.0",
     });
     result.updated += 1;
-    writes += 1;
   }
 
+  await writer.close();
   return result;
 }
 
 function serializeCandidate(event: EventCandidate) {
   return {
     ...event,
-    startDate: Timestamp.fromDate(event.startDate),
-    endDate: Timestamp.fromDate(event.endDate),
+    startDate: dateKey(event.startDate),
+    endDate: dateKey(event.endDate),
   };
+}
+
+function dateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }

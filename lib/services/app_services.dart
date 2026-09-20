@@ -17,7 +17,10 @@ class AuthService {
 
   static Future<void> login(String email, String password) async {
     try {
-      await firebaseAuth.signInWithEmailAndPassword(email: email, password: password);
+      await firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
     } catch (e, s) {
       AppLog.error('Login failed', e, s);
       rethrow;
@@ -26,7 +29,10 @@ class AuthService {
 
   static Future<void> register(String email, String password) async {
     try {
-      await firebaseAuth.createUserWithEmailAndPassword(email: email, password: password);
+      await firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
     } catch (e, s) {
       AppLog.error('Registration failed', e, s);
       rethrow;
@@ -92,10 +98,7 @@ class UserService {
       });
       batch.set(
         firestoreDB.collection('leaderboardProfiles').doc(uid),
-        {
-          'username': username,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
+        {'username': username, 'updatedAt': FieldValue.serverTimestamp()},
         SetOptions(merge: true),
       );
       await batch.commit();
@@ -121,13 +124,19 @@ class LocationService {
       throw Exception('ไม่อนุญาตการเข้าถึงตำแหน่ง');
     }
     // ดึงพิกัดพร้อมตั้งเวลา Timeout ป้องกันแอพค้างหากอับสัญญาณ GPS
-    return Geolocator.getCurrentPosition(timeLimit: const Duration(seconds: 15));
+    return Geolocator.getCurrentPosition(
+      timeLimit: const Duration(seconds: 15),
+    );
   }
 
-  static Future<String> getProvinceNameFromCoordinates(double lat, double lng) async {
+  static Future<String> getProvinceNameFromCoordinates(
+    double lat,
+    double lng,
+  ) async {
     await setLocaleIdentifier('th_TH');
     final placemarks = await placemarkFromCoordinates(lat, lng);
-    String provinceName = placemarks.first.administrativeArea ?? 'ไม่สามารถระบุจังหวัดได้';
+    String provinceName =
+        placemarks.first.administrativeArea ?? 'ไม่สามารถระบุจังหวัดได้';
     return provinceName.replaceAll('จังหวัด', '').trim();
   }
 }
@@ -201,12 +210,18 @@ class AdminService {
 
         if (otopProducts != null) {
           for (int i = 0; i < otopProducts.length; i++) {
-            batch.set(docRef.collection('otopProducts').doc('otop_$i'), Map<String, dynamic>.from(otopProducts[i] as Map));
+            batch.set(
+              docRef.collection('otopProducts').doc('otop_$i'),
+              Map<String, dynamic>.from(otopProducts[i] as Map),
+            );
           }
         }
         if (attractions != null) {
           for (int i = 0; i < attractions.length; i++) {
-            batch.set(docRef.collection('attractions').doc('attr_$i'), Map<String, dynamic>.from(attractions[i] as Map));
+            batch.set(
+              docRef.collection('attractions').doc('attr_$i'),
+              Map<String, dynamic>.from(attractions[i] as Map),
+            );
           }
         }
       }
@@ -219,24 +234,50 @@ class AdminService {
 }
 
 /// Service สำหรับอ่านอีเวนต์ที่เผยแพร่แล้วจาก Firestore
+class EventPage {
+  const EventPage({
+    required this.events,
+    required this.lastDocument,
+    required this.hasMore,
+  });
+
+  final List<Map<String, dynamic>> events;
+  final DocumentSnapshot<Map<String, dynamic>>? lastDocument;
+  final bool hasMore;
+}
+
 class EventService {
   EventService._();
 
-  static Stream<List<Map<String, dynamic>>> watchAdminEvents() {
-    return firestoreDB.collection('events').snapshots().map((snapshot) {
-      final events = snapshot.docs
-          .map((doc) => _normalizeEventData(doc.id, doc.data()))
-          .toList();
-      events.sort((a, b) {
-        final aDate = _parseEventDate(a['updatedAt']) ?? _parseEventDate(a['startDate']);
-        final bDate = _parseEventDate(b['updatedAt']) ?? _parseEventDate(b['startDate']);
-        if (aDate == null && bDate == null) return 0;
-        if (aDate == null) return 1;
-        if (bDate == null) return -1;
-        return bDate.compareTo(aDate);
-      });
-      return events;
-    });
+  static const int defaultPageSize = 25;
+
+  static Future<EventPage> fetchAdminEventsPage({
+    required String status,
+    String? province,
+    int limit = defaultPageSize,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> query = firestoreDB
+        .collection('events')
+        .where('status', isEqualTo: status);
+
+    if (province != null && province.isNotEmpty) {
+      query = query.where('province', isEqualTo: province);
+    }
+
+    query = query.orderBy('startDate', descending: true).limit(limit);
+    if (startAfter != null) query = query.startAfterDocument(startAfter);
+
+    final snapshot = await query.get();
+    final events = snapshot.docs
+        .map((doc) => _normalizeEventData(doc.id, doc.data()))
+        .toList();
+
+    return EventPage(
+      events: events,
+      lastDocument: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+      hasMore: snapshot.docs.length == limit,
+    );
   }
 
   static Future<void> saveEvent({
@@ -276,37 +317,71 @@ class EventService {
     });
   }
 
-  static Future<List<Map<String, dynamic>>> fetchPublishedEventsByProvince(
-    String provinceName,
-  ) async {
+  static Future<EventPage> fetchPublishedEventsByProvincePage({
+    required String provinceName,
+    int limit = defaultPageSize,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
     final normalizedProvince = _normalizeProvinceName(provinceName);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayKey = _dateKey(today);
 
     try {
-      final snapshot = await firestoreDB
+      Query<Map<String, dynamic>> query = firestoreDB
           .collection('events')
-          .where('province', isEqualTo: normalizedProvince)
           .where('status', isEqualTo: 'published')
-          .get();
+          .where('province', isEqualTo: normalizedProvince)
+          .where('startDate', isGreaterThanOrEqualTo: todayKey)
+          .orderBy('startDate')
+          .limit(limit);
 
-      final events = snapshot.docs
-          .map((doc) => _normalizeEventData(doc.id, doc.data()))
-          .where((event) => event['status'] == 'published')
-          .toList();
+      if (startAfter != null) query = query.startAfterDocument(startAfter);
 
-      events.sort((a, b) {
-        final aDate = _parseEventDate(a['startDate']);
-        final bDate = _parseEventDate(b['startDate']);
-        if (aDate == null && bDate == null) return 0;
-        if (aDate == null) return 1;
-        if (bDate == null) return -1;
-        return aDate.compareTo(bDate);
-      });
+      final snapshot = await query.get();
+      final eventMap = <String, Map<String, dynamic>>{};
 
-      return events;
+      if (startAfter == null) {
+        final ongoingSnapshot = await firestoreDB
+            .collection('events')
+            .where('status', isEqualTo: 'published')
+            .where('province', isEqualTo: normalizedProvince)
+            .where('startDate', isLessThan: todayKey)
+            .orderBy('startDate', descending: true)
+            .limit(10)
+            .get();
+
+        for (final doc in ongoingSnapshot.docs) {
+          final event = _normalizeEventData(doc.id, doc.data());
+          if (_isActiveEvent(event, todayKey)) eventMap[doc.id] = event;
+        }
+      }
+
+      for (final doc in snapshot.docs) {
+        eventMap[doc.id] = _normalizeEventData(doc.id, doc.data());
+      }
+
+      final events = eventMap.values.toList()
+        ..sort(
+          (a, b) =>
+              a['startDate'].toString().compareTo(b['startDate'].toString()),
+        );
+
+      return EventPage(
+        events: events,
+        lastDocument: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+        hasMore: snapshot.docs.length == limit,
+      );
     } catch (e, s) {
       AppLog.error('Fetch Firestore events failed', e, s);
       throw Exception('ไม่สามารถโหลดข้อมูลอีเวนต์ได้');
     }
+  }
+
+  static bool _isActiveEvent(Map<String, dynamic> event, String todayKey) {
+    final endDate = event['endDate']?.toString() ?? '';
+    if (endDate.isEmpty) return true;
+    return endDate.compareTo(todayKey) >= 0;
   }
 
   static Map<String, dynamic> _normalizeEventData(
@@ -336,26 +411,26 @@ class EventService {
 
   static String _formatEventDateValue(dynamic value) {
     if (value == null) return '';
-    if (value is Timestamp) return value.toDate().toIso8601String();
-    if (value is DateTime) return value.toIso8601String();
+    if (value is Timestamp) return _dateKey(value.toDate());
+    if (value is DateTime) return _dateKey(value);
     return value.toString();
-  }
-
-  static DateTime? _parseEventDate(dynamic value) {
-    if (value == null) return null;
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
-    return DateTime.tryParse(value.toString());
   }
 
   static String _normalizeProvinceName(String name) =>
       name.replaceAll('จังหวัด', '').replaceAll('จ.', '').trim();
+
+  static String _dateKey(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }
 
 class AttractionService {
   AttractionService._();
 
-  static Future<List<dynamic>> fetchAttractionsByProvince(String provinceName) async {
+  static Future<List<dynamic>> fetchAttractionsByProvince(
+    String provinceName,
+  ) async {
     try {
       final callable = cloudFunctions.httpsCallable('fetchAttractions');
       final result = await callable.call<Map<String, dynamic>>({
