@@ -52,6 +52,15 @@ async function seed() {
       stampCount: 2,
       updatedAt: new Date(),
     });
+    await setDoc(doc(db, "eventSources/tat-monthly-calendar"), {
+      name: "TAT monthly calendar",
+      enabled: true,
+      updatedAt: new Date(),
+    });
+    await setDoc(doc(db, "importRuns/run-1"), {
+      status: "success",
+      startedAt: new Date(),
+    });
   });
 }
 
@@ -124,5 +133,33 @@ describe("admin claims", () => {
         status: "draft",
       }),
     );
+  });
+
+  it("allows admins to monitor imports and toggle only source availability", async () => {
+    await seed();
+    const admin = testEnv
+      .authenticatedContext("admin-user", { admin: true })
+      .firestore();
+    await assertSucceeds(getDoc(doc(admin, "importRuns/run-1")));
+    await assertSucceeds(getDoc(doc(admin, "eventSources/tat-monthly-calendar")));
+    await assertSucceeds(
+      updateDoc(doc(admin, "eventSources/tat-monthly-calendar"), {
+        enabled: false,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(admin, "eventSources/tat-monthly-calendar"), {
+        consecutiveFailures: 0,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it("denies importer operations to ordinary users", async () => {
+    await seed();
+    const user = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(getDoc(doc(user, "importRuns/run-1")));
+    await assertFails(getDoc(doc(user, "eventSources/tat-monthly-calendar")));
   });
 });

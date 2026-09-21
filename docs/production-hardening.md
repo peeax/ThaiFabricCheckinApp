@@ -55,6 +55,9 @@ npm --prefix functions run migrate-security
 5. Admin screens work after a forced token refresh.
 6. `fetchAttractions` returns cached data without exposing the TAT key.
 
+Event importer scheduling and Workload Identity setup are documented in
+[`event-importer-operations.md`](event-importer-operations.md).
+
 ## Key history
 
 `.env` is no longer tracked, but old commits still contain the retired keys.

@@ -22,17 +22,67 @@ export const eventCandidateSchema = z.object({
 
 export type EventCandidate = z.infer<typeof eventCandidateSchema>;
 
-export type ImportSummary = {
+export type RawEventSnapshot = {
   sourceKey: string;
+  sourceEventId: string;
   sourceUrl: string;
+  retrievedAt: Date;
+  contentHash: string;
+  rawData: unknown;
+};
+
+export type SourceResult = {
+  sourceKey: string;
+  sourceName: string;
+  sourceUrl: string;
+  events: EventCandidate[];
+  snapshots: RawEventSnapshot[];
+  errors: string[];
+  warnings: string[];
+};
+
+export type SourceContext = {
+  now: Date;
+  postId?: number;
+  limit: number;
+};
+
+export type SourceAdapter = {
+  key: string;
+  name: string;
+  sourceUrl: string;
+  scheduleGroup: "frequent" | "daily" | "weekly";
+  enabledByDefault: boolean;
+  fetch(context: SourceContext): Promise<SourceResult>;
+};
+
+export type SourceRunSummary = {
+  sourceKey: string;
+  sourceName: string;
+  sourceUrl: string;
+  status: "success" | "warning" | "failed";
+  found: number;
+  valid: number;
+  rejected: number;
+  warnings: string[];
+  errors: string[];
+  durationMs: number;
+};
+
+export type ImportSummary = {
+  runId: string;
+  trigger: "manual" | "scheduled";
+  group: string;
   dryRun: boolean;
   found: number;
   valid: number;
   rejected: number;
   created: number;
   updated: number;
+  duplicates: number;
   protected: number;
   events: EventCandidate[];
+  sources: SourceRunSummary[];
   errors: string[];
   warnings: string[];
 };

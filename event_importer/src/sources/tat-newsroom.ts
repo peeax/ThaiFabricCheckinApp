@@ -10,11 +10,12 @@ const categoryId = 263;
 const sourceKey = "tat-newsroom-monthly";
 const calendarTitlePattern = /(event and calendar|festivals and events in thailand)/i;
 
-type WordPressPost = {
+export type WordPressPost = {
   id: number;
   link: string;
   title: { rendered: string };
   content: { rendered: string };
+  excerpt?: { rendered: string };
   _embedded?: {
     "wp:featuredmedia"?: Array<{ source_url?: string }>;
   };
@@ -36,13 +37,18 @@ export async function fetchTatNewsroomEvents(
 }
 
 async function fetchLatestCalendarPost(): Promise<WordPressPost> {
-  const url = `${apiBase}/posts?categories=${categoryId}&per_page=20&_embed=1`;
-  const posts = await fetchJson<WordPressPost[]>(url);
+  const posts = await fetchNewsroomPosts(20);
   const calendarPost = posts.find((post) =>
     calendarTitlePattern.test(decodeHtml(post.title.rendered)),
   );
   if (!calendarPost) throw new Error("No recent TAT calendar post was found");
   return calendarPost;
+}
+
+export function fetchNewsroomPosts(limit = 20): Promise<WordPressPost[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const url = `${apiBase}/posts?categories=${categoryId}&per_page=${safeLimit}&_embed=1`;
+  return fetchJson<WordPressPost[]>(url);
 }
 
 async function fetchPost(postId: number): Promise<WordPressPost> {

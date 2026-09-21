@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dry-run": "tsx src/index.ts",
+    "dry-run:daily": "tsx src/index.ts --group daily",
+    "dry-run:frequent": "tsx src/index.ts --group frequent",
     "import": "tsx src/index.ts --write",
+    "import:daily": "tsx src/index.ts --write --group daily --trigger scheduled",
+    "import:frequent": "tsx src/index.ts --write --group frequent --trigger scheduled",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

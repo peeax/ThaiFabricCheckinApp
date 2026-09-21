@@ -7,6 +7,7 @@ import '../../core/app_state.dart';
 import '../../services/app_services.dart';
 import '../../widgets/shared_widgets.dart';
 import '../admin/admin_events_screen.dart';
+import '../admin/admin_import_monitor_screen.dart';
 import 'edit_profile_screen.dart';
 import 'faq_screen.dart';
 
@@ -172,6 +173,26 @@ class _ProfileViewState extends State<ProfileView> {
                       const Divider(height: 24),
                       GestureDetector(
                         behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AdminImportMonitorScreen(),
+                          ),
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('สถานะนำเข้าอีเวนต์'),
+                              Icon(Symbols.monitor_heart),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 24),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: _isSyncing ? null : _syncProvinces,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -183,7 +204,9 @@ class _ProfileViewState extends State<ProfileView> {
                                   ? const SizedBox(
                                       width: 18,
                                       height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Icon(Symbols.sync),
                             ],

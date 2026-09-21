@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { parseEnglishDateRange } from "../src/date-parser.js";
+import {
+  parseEnglishDateRange,
+  parseEnglishDateRangeFromText,
+} from "../src/date-parser.js";
 
 describe("parseEnglishDateRange", () => {
   it.each([
@@ -17,5 +20,32 @@ describe("parseEnglishDateRange", () => {
 
   it("rejects unsupported text", () => {
     expect(parseEnglishDateRange("Every weekend")).toBeNull();
+  });
+});
+
+describe("parseEnglishDateRangeFromText", () => {
+  it.each([
+    [
+      "Running from 29 October 2026 to 28 February 2027 in Bangkok.",
+      undefined,
+      "2026-10-29",
+      "2027-02-28",
+    ],
+    [
+      "The festival takes place from 11–20 September 2026.",
+      undefined,
+      "2026-09-11",
+      "2026-09-20",
+    ],
+    [
+      "From 17 August to 6 November along the river.",
+      2026,
+      "2026-08-17",
+      "2026-11-06",
+    ],
+  ])("extracts dates from prose", (input, year, expectedStart, expectedEnd) => {
+    const result = parseEnglishDateRangeFromText(input, year);
+    expect(result?.startDate.toISOString().slice(0, 10)).toBe(expectedStart);
+    expect(result?.endDate.toISOString().slice(0, 10)).toBe(expectedEnd);
   });
 });

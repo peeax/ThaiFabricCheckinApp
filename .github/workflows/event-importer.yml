@@ -1,0 +1,112 @@
+name: Event importer
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+    inputs:
+      group:
+        description: Source schedule group
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - frequent
+          - daily
+          - weekly
+      write:
+        description: Write validated drafts to Firestore
+        required: true
+        default: false
+        type: boolean
+      limit:
+        description: Maximum number of events
+        required: true
+        default: "50"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: event-importer-production
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: event_importer
+    env:
+      FIREBASE_PROJECT_ID: thai-fabric-check-in-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: event_importer/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - id: mode
+        name: Resolve schedule group and safety mode
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          INPUT_GROUP: ${{ inputs.group }}
+          INPUT_WRITE: ${{ inputs.write }}
+          SCHEDULED_WRITE_ENABLED: ${{ vars.EVENT_IMPORT_WRITE_ENABLED }}
+          INPUT_LIMIT: ${{ inputs.limit }}
+        run: |
+          group="${INPUT_GROUP:-all}"
+          limit="${INPUT_LIMIT:-50}"
+          write="false"
+
+          if [[ "$EVENT_NAME" == "schedule" ]]; then
+            if [[ "$EVENT_SCHEDULE" == "15 */6 * * *" ]]; then
+              group="frequent"
+            else
+              group="daily"
+            fi
+            [[ "$SCHEDULED_WRITE_ENABLED" == "true" ]] && write="true"
+          elif [[ "$INPUT_WRITE" == "true" ]]; then
+            write="true"
+          fi
+
+          echo "group=$group" >> "$GITHUB_OUTPUT"
+          echo "limit=$limit" >> "$GITHUB_OUTPUT"
+          echo "write=$write" >> "$GITHUB_OUTPUT"
+      - id: auth
+        name: Authenticate to Google Cloud
+        if: steps.mode.outputs.write == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: thai-fabric-check-in-app
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_EVENT_IMPORTER_SERVICE_ACCOUNT }}
+      - name: Fetch, validate, and optionally write drafts
+        shell: bash
+        env:
+          GROUP: ${{ steps.mode.outputs.group }}
+          LIMIT: ${{ steps.mode.outputs.limit }}
+          WRITE: ${{ steps.mode.outputs.write }}
+        run: |
+          if [[ "$WRITE" == "true" ]]; then
+            npm run import -- --group "$GROUP" --limit "$LIMIT" --trigger scheduled
+          else
+            npm run dry-run -- --group "$GROUP" --limit "$LIMIT" --trigger scheduled
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: event-importer-${{ github.run_id }}
+          path: event_importer/dry-run-output.json
+          if-no-files-found: warn
+          retention-days: 30

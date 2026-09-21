@@ -1,5 +1,6 @@
 const provinceEntries = [
   ["Bangkok", "กรุงเทพมหานคร"],
+  ["Pattaya", "ชลบุรี"],
   ["Amnat Charoen", "อำนาจเจริญ"],
   ["Ang Thong", "อ่างทอง"],
   ["Bueng Kan", "บึงกาฬ"],
@@ -88,11 +89,17 @@ const sortedEntries = [...provinceEntries].sort(
   ([left], [right]) => right.length - left.length,
 );
 
+const thaiProvinces = new Set(provinceEntries.map(([, thai]) => thai));
+
 export function findProvince(text: string) {
   const normalized = text.toLowerCase();
-  return sortedEntries.find(([english]) =>
-    normalized.includes(english.toLowerCase()),
-  );
+  return sortedEntries.find(([english]) => {
+    const provincePattern = new RegExp(
+      `(?:^|[^a-z])${escapeRegExp(english.toLowerCase())}(?:[^a-z]|$)`,
+      "i",
+    );
+    return provincePattern.test(normalized);
+  });
 }
 
 export function removeProvince(text: string, englishProvince: string): string {
@@ -106,6 +113,21 @@ export function removeProvince(text: string, englishProvince: string): string {
     "i",
   );
   return trimmed.replace(trailingProvince, "").trim();
+}
+
+export function normalizeProvince(value: string): string | null {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/^จ(?:ังหวัด|\.)\s*/, "")
+    .trim();
+  if (thaiProvinces.has(normalized as (typeof provinceEntries)[number][1])) {
+    return normalized;
+  }
+  return findProvince(normalized)?.[1] ?? null;
+}
+
+export function provinceCount(): number {
+  return thaiProvinces.size;
 }
 
 function escapeRegExp(value: string): string {

@@ -425,6 +425,36 @@ class EventService {
       '${date.day.toString().padLeft(2, '0')}';
 }
 
+class ImporterMonitoringService {
+  ImporterMonitoringService._();
+
+  static Future<List<Map<String, dynamic>>> fetchSources() async {
+    final snapshot = await firestoreDB
+        .collection('eventSources')
+        .orderBy('name')
+        .get();
+    return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchRecentRuns({
+    int limit = 20,
+  }) async {
+    final snapshot = await firestoreDB
+        .collection('importRuns')
+        .orderBy('startedAt', descending: true)
+        .limit(limit)
+        .get();
+    return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+  }
+
+  static Future<void> setSourceEnabled(String sourceId, bool enabled) async {
+    await firestoreDB.collection('eventSources').doc(sourceId).update({
+      'enabled': enabled,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
 class AttractionService {
   AttractionService._();
 
